@@ -8,6 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     
     <style>
+        /* 基本樣式設定 */
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; color: #333; }
         .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); }
         h1, h2 { color: #007bff; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 20px; }
@@ -17,15 +18,15 @@
         button { background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; transition: background-color 0.3s; }
         button:hover { background-color: #0056b3; }
         
-        /* 記帳列表樣式 */
+        /* 交易列表樣式 */
         #recordsTable { width: 100%; border-collapse: collapse; margin-top: 20px; }
         #recordsTable th, #recordsTable td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         #recordsTable th { background-color: #f2f2f2; }
         .income { color: green; font-weight: bold; }
         .expense { color: red; font-weight: bold; }
 
-        /* 超出預算紅字標示 */
-        .overspent { color: red; font-weight: bold; }
+        /* 特殊標示 */
+        .overspent { color: red; font-weight: bold; } /* 超出預算紅字 */
 
         /* 登入區塊 */
         #auth-overlay {
@@ -122,7 +123,7 @@
 
         let currentUsername = null; // 當前登入的帳號
 
-        // --- 帳號管理 ---
+        // --- I. 帳號登入/註冊邏輯 ---
 
         function getAllUsers() {
             const usersJson = localStorage.getItem(ALL_USERS_KEY);
@@ -133,6 +134,186 @@
             localStorage.setItem(ALL_USERS_KEY, JSON.stringify(users));
         }
 
-        // 登入/註冊處理
         function handleAuthSubmit(event) {
             event.preventDefault();
+            
+            const usernameInput = document.getElementById('username').value.trim();
+            const passwordInput = document.getElementById('password').value;
+            const authMessage = document.getElementById('auth-message');
+            
+            const users = getAllUsers();
+
+            if (!usernameInput || !passwordInput) {
+                authMessage.textContent = '帳號和密碼不能為空。';
+                return;
+            }
+
+            if (users.hasOwnProperty(usernameInput)) {
+                // 登入流程
+                if (users[usernameInput].password === passwordInput) {
+                    currentUsername = usernameInput;
+                    authMessage.textContent = '';
+                    loginSuccess(); // <--- 成功登入
+                } else {
+                    authMessage.textContent = '密碼錯誤。';
+                }
+            } else {
+                // 註冊流程
+                
+                // 註冊成功，儲存新帳號
+                users[usernameInput] = {
+                    password: passwordInput,
+                    dataKey: `LedgerData_${usernameInput}`
+                };
+                saveAllUsers(users);
+                
+                currentUsername = usernameInput;
+                authMessage.textContent = '';
+                loginSuccess(); // <--- 成功註冊並登入
+                alert(`帳號 "${usernameInput}" 註冊成功並已自動登入！`);
+            }
+        }
+        
+        function logout() {
+            currentUsername = null;
+            document.getElementById('auth-overlay').style.display = 'flex';
+            document.getElementById('app-content').style.display = 'none';
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+        }
+
+        function loginSuccess() {
+            // **關鍵步驟：隱藏登入頁面，顯示主程式**
+            document.getElementById('auth-overlay').style.display = 'none'; 
+            document.getElementById('app-content').style.display = 'block'; 
+            document.getElementById('user-info').textContent = `歡迎您，${currentUsername}！`;
+            
+            updateUI(); // 載入並顯示該用戶的資料
+        }
+
+
+        // --- II. 資料與記帳核心邏輯 ---
+
+        // 資料管理函數 (根據當前用戶隔離數據)
+        function getCurrentDataKey() {
+            if (!currentUsername) return null;
+            const users = getAllUsers();
+            return users[currentUsername] ? users[currentUsername].dataKey : null;
+        }
+
+        function loadUserData() {
+            const dataKey = getCurrentDataKey();
+            if (!dataKey) return { transactions: [], budgets: {} };
+            const storedData = localStorage.getItem(dataKey);
+            if (storedData) {
+                return JSON.parse(storedData);
+            }
+            return { transactions: [], budgets: {} };
+        }
+
+        function saveUserData(data) {
+            const dataKey = getCurrentDataKey();
+            if (dataKey) {
+                localStorage.setItem(dataKey, JSON.stringify(data));
+            }
+        }
+        
+        // 輔助函數
+        function getCurrentMonthKey() {
+            return new Date().toISOString().substring(0, 7); // YYYY-MM
+        }
+
+        function getCategorySpending(monthKey) {
+            const userData = loadUserData();
+            const monthlySpending = {};
+            const transactions = userData.transactions.filter(t => t.month === monthKey && t.type === '支出');
+            
+            DEFAULT_CATEGORIES.forEach(cat => monthlySpending[cat] = 0);
+
+            transactions.forEach(t => {
+                if (monthlySpending.hasOwnProperty(t.category)) {
+                    monthlySpending[t.category] += t.amount;
+                }
+            });
+            return monthlySpending;
+        }
+
+        // 1. 交易紀錄功能
+        function handleTransactionSubmit(event) {
+            event.preventDefault();
+            const dateInput = document.getElementById('date').value;
+            const monthKey = dateInput.substring(0, 7);
+            const userData = loadUserData();
+
+            const newTransaction = {
+                id: Date.now(),
+                type: document.getElementById('type').value,
+                amount: parseFloat(document.getElementById('amount').value),
+                date: dateInput,
+                category: document.getElementById('category').value,
+                note: document.getElementById('note').value,
+                month: monthKey
+            };
+
+            userData.transactions.push(newTransaction);
+            saveUserData(userData);
+            document.getElementById('transactionForm').reset();
+            updateUI(); 
+        }
+
+        // 3. 預算設定功能
+        function handleBudgetSubmit(event) {
+            event.preventDefault();
+            const monthKey = getCurrentMonthKey();
+            const category = document.getElementById('budgetCategory').value;
+            const amount = parseFloat(document.getElementById('budgetAmount').value);
+            const userData = loadUserData();
+
+            if (!userData.budgets[monthKey]) {
+                userData.budgets[monthKey] = {};
+            }
+
+            userData.budgets[monthKey][category] = amount;
+            saveUserData(userData);
+            document.getElementById('budgetForm').reset();
+            updateUI(); 
+            alert(`${monthKey} 的 ${category} 預算已設定為 ${amount}。`);
+        }
+
+        // 2. 數據呈現與分析
+
+        function renderBudgetSummary(monthKey, categorySpending) {
+            const tableBody = document.querySelector('#budgetSummaryTable tbody');
+            tableBody.innerHTML = '';
+            const userData = loadUserData();
+            const budgetData = userData.budgets[monthKey] || {};
+            const relevantCategories = DEFAULT_CATEGORIES.filter(cat => (budgetData[cat] || categorySpending[cat]) && cat !== '薪水' && cat !== '投資');
+
+            relevantCategories.forEach(category => {
+                const budget = budgetData[category] || 0;
+                const spent = categorySpending[category] || 0;
+                const remaining = budget - spent;
+                
+                const row = tableBody.insertRow();
+                const overspentClass = remaining < 0 ? 'overspent' : ''; 
+
+                row.insertCell().textContent = category;
+                row.insertCell().textContent = budget.toLocaleString();
+                row.insertCell().textContent = spent.toLocaleString();
+                
+                const remainingCell = row.insertCell();
+                remainingCell.textContent = remaining.toLocaleString();
+                remainingCell.classList.add(overspentClass); // 超出預算紅字
+            });
+
+            if (relevantCategories.length === 0) {
+                 const row = tableBody.insertRow();
+                 const cell = row.insertCell();
+                 cell.colSpan = 4;
+                 cell.textContent = '本月尚未設定預算或產生支出。';
+                 cell.style.textAlign = 'center';
+            }
+        }
+        
+        let monthlyChartInstance = null;
+        function renderMonthlyChart(month
