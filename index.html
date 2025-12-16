@@ -119,8 +119,7 @@
     <script>
         // 核心設定
         const ALL_USERS_KEY = 'PersonalLedgerUsers'; 
-        // 類別清單已新增「其他」
-        const DEFAULT_CATEGORIES = ['餐飲', '交通', '住房', '娛樂', '購物', '薪水', '投資', '其他']; 
+        const DEFAULT_CATEGORIES = ['餐飲', '交通', '住房', '娛樂', '購物', '薪水', '投資'];
 
         let currentUsername = null; 
 
@@ -227,7 +226,6 @@
         function getCategorySpending(monthKey) {
             const userData = loadUserData();
             const monthlySpending = {};
-            // 現在 '其他' 也會被包含在支出統計中
             const transactions = userData.transactions.filter(t => t.month === monthKey && t.type === '支出');
             
             DEFAULT_CATEGORIES.forEach(cat => monthlySpending[cat] = 0);
@@ -288,9 +286,7 @@
             tableBody.innerHTML = '';
             const userData = loadUserData();
             const budgetData = userData.budgets[monthKey] || {};
-            // 預算表格只顯示支出類別
-            const expenseCategories = DEFAULT_CATEGORIES.filter(cat => cat !== '薪水' && cat !== '投資'); 
-            const relevantCategories = expenseCategories.filter(cat => budgetData[cat] || categorySpending[cat]);
+            const relevantCategories = DEFAULT_CATEGORIES.filter(cat => (budgetData[cat] || categorySpending[cat]) && cat !== '薪水' && cat !== '投資');
 
             relevantCategories.forEach(category => {
                 const budget = budgetData[category] || 0;
@@ -323,7 +319,6 @@
             const userData = loadUserData();
             const budgetData = userData.budgets[monthKey] || {};
             
-            // 圖表只顯示支出類別
             const categories = DEFAULT_CATEGORIES.filter(cat => 
                 (categorySpending[cat] > 0 || budgetData[cat] > 0) && cat !== '薪水' && cat !== '投資'
             );
@@ -386,25 +381,18 @@
             });
         }
         
-        // 類別選單動態生成函數
         function populateCategorySelectors() {
             const selectors = [
-                document.getElementById('category'), // 交易紀錄 (所有類別)
-                document.getElementById('budgetCategory') // 預算設定 (僅支出類別)
+                document.getElementById('category'),
+                document.getElementById('budgetCategory')
             ];
 
             selectors.forEach(select => {
                 select.innerHTML = '';
                 const fragment = document.createDocumentFragment();
-                
-                // 支出專用類別清單：排除「薪水」和「投資」
                 const expenseCategories = DEFAULT_CATEGORIES.filter(cat => cat !== '薪水' && cat !== '投資'); 
 
-                // 如果是交易紀錄選單，則使用 DEFAULT_CATEGORIES (包含收入)
-                // 如果是預算設定選單，則使用 expenseCategories (僅支出)
-                const categoriesToUse = select.id === 'category' ? DEFAULT_CATEGORIES : expenseCategories;
-                
-                categoriesToUse.forEach(cat => {
+                (select.id === 'category' ? DEFAULT_CATEGORIES : expenseCategories).forEach(cat => {
                     const option = document.createElement('option');
                     option.value = cat;
                     option.textContent = cat;
@@ -446,4 +434,5 @@
         });
     </script>
 </body>
+</html>
 </html>
