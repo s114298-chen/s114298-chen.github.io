@@ -1,11 +1,138 @@
-<!doctype html>
-<html>
-  <head>
-    <meta charset = "utf-8">
-    <title>網站標題</title>
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>個人記帳程式 - 網頁版</title>
     <link rel="icon" href="722320.png">
-  </head>
-  <body>
-      hello world
-  </body>
-</html>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; color: #333; }
+        .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); }
+        h1, h2 { color: #007bff; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 20px; }
+        .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        form { display: flex; flex-direction: column; gap: 15px; }
+        input[type="text"], input[type="number"], input[type="date"], input[type="password"], select { padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
+        button { background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; transition: background-color 0.3s; }
+        button:hover { background-color: #0056b3; }
+        
+        /* 記帳列表樣式 */
+        #recordsTable { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        #recordsTable th, #recordsTable td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        #recordsTable th { background-color: #f2f2f2; }
+        .income { color: green; font-weight: bold; }
+        .expense { color: red; font-weight: bold; }
+
+        /* 超出預算紅字標示 */
+        .overspent { color: red; font-weight: bold; }
+
+        /* 登入區塊 */
+        #auth-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; 
+            z-index: 1000;
+        }
+        #auth-box { background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 0 20px rgba(0, 0, 0, 0.5); text-align: center; }
+        #app-content { display: none; }
+        #logout-btn { background-color: #dc3545; position: absolute; top: 20px; right: 20px; }
+    </style>
+</head>
+<body>
+
+    <div id="auth-overlay">
+        <div id="auth-box">
+            <h2>請登入或註冊</h2>
+            <form id="authForm" style="gap: 10px;">
+                <input type="text" id="username" placeholder="帳號" required>
+                <input type="password" id="password" placeholder="密碼" required>
+                <button type="submit" id="loginBtn">登入 / 註冊</button>
+                <p id="auth-message" style="color: red;"></p>
+            </form>
+        </div>
+    </div>
+
+    <div class="container">
+        <h1 id="app-title">個人記帳程式</h1>
+        <button id="logout-btn">登出</button>
+
+        <div id="app-content">
+            <p id="user-info">歡迎您！</p>
+
+            <div class="grid-container">
+                <div>
+                    <h2>1. 交易紀錄 (收入/支出)</h2>
+                    <form id="transactionForm">
+                        <select id="type" required>
+                            <option value="支出">支出</option>
+                            <option value="收入">收入</option>
+                        </select>
+                        <input type="number" id="amount" placeholder="金額 (例如: 500)" min="0.01" step="0.01" required>
+                        <input type="date" id="date" required>
+                        <select id="category" required>
+                            </select>
+                        <input type="text" id="note" placeholder="備註/說明 (例如: 午餐)">
+                        <button type="submit">紀錄交易</button>
+                    </form>
+
+                    <h2>3. 預算設定 (當月)</h2>
+                    <form id="budgetForm">
+                        <select id="budgetCategory" required>
+                            </select>
+                        <input type="number" id="budgetAmount" placeholder="每月預算上限" min="1" step="1" required>
+                        <button type="submit">設定/更新預算</button>
+                    </form>
+                </div>
+
+                <div>
+                    <h2>2. 當月開支報告與預算追蹤</h2>
+                    <p>目前月份：<strong id="currentMonthText"></strong></p>
+                    <table id="budgetSummaryTable" style="width:100%; margin-bottom: 20px;">
+                        <thead><tr><th>類別</th><th>預算</th><th>已花費</th><th>結餘</th></tr></thead>
+                        <tbody>
+                            </tbody>
+                    </table>
+                    
+                    <h3>當月支出長條圖 </h3>
+                    <canvas id="monthlyChart"></canvas>
+                </div>
+            </div>
+            
+            <h2>歷史交易列表</h2>
+            <table id="recordsTable">
+                <thead>
+                    <tr>
+                        <th>日期</th>
+                        <th>類型</th>
+                        <th>類別</th>
+                        <th>金額</th>
+                        <th>備註</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // 核心設定
+        const ALL_USERS_KEY = 'PersonalLedgerUsers'; // 儲存所有帳號資訊
+        const DEFAULT_CATEGORIES = ['餐飲', '交通', '住房', '娛樂', '購物', '薪水', '投資'];
+
+        let currentUsername = null; // 當前登入的帳號
+
+        // --- 帳號管理 ---
+
+        function getAllUsers() {
+            const usersJson = localStorage.getItem(ALL_USERS_KEY);
+            return usersJson ? JSON.parse(usersJson) : {};
+        }
+
+        function saveAllUsers(users) {
+            localStorage.setItem(ALL_USERS_KEY, JSON.stringify(users));
+        }
+
+        // 登入/註冊處理
+        function handleAuthSubmit(event) {
+            event.preventDefault();
