@@ -149,6 +149,8 @@
             const usernameInput = document.getElementById('username').value.trim();
             const passwordInput = document.getElementById('password').value;
             const authMessage = document.getElementById('auth-message');
+            const usernameField = document.getElementById('username');
+            const passwordField = document.getElementById('password');
             
             const users = getAllUsers();
 
@@ -162,7 +164,9 @@
                 if (users[usernameInput].password === passwordInput) {
                     currentUsername = usernameInput;
                     authMessage.textContent = '';
-                    loginSuccess(); // <--- 成功登入
+                    usernameField.value = ''; // 登入成功後清空欄位
+                    passwordField.value = '';
+                    loginSuccess(); 
                 } else {
                     authMessage.textContent = '密碼錯誤。';
                 }
@@ -178,7 +182,9 @@
                 
                 currentUsername = usernameInput;
                 authMessage.textContent = '';
-                loginSuccess(); // <--- 成功註冊並登入
+                usernameField.value = ''; // 註冊成功後清空欄位
+                passwordField.value = '';
+                loginSuccess(); 
                 alert(`帳號 "${usernameInput}" 註冊成功並已自動登入！`);
             }
         }
@@ -192,166 +198,9 @@
         }
 
         function loginSuccess() {
-            // **核心切換：強制隱藏登入介面，強制顯示記帳區**
             const authOverlay = document.getElementById('auth-overlay');
             const appContent = document.getElementById('app-content');
 
+            // **關鍵修復點 1: 立即設定顯示/隱藏**
             authOverlay.style.display = 'none'; 
-            appContent.style.display = 'block'; 
-            
-            // 雙重檢查：如果切換後仍然看不到主介面，可能是 CSS 或其他問題。
-            if (appContent.style.display !== 'block') {
-                 console.error("登入成功但畫面未顯示。可能存在 CSS 衝突。");
-                 alert("登入成功！如果記帳區未出現，請嘗試清除瀏覽器快取 (Ctrl+Shift+R)。");
-            }
-            
-            document.getElementById('user-info').textContent = `歡迎您，${currentUsername}！`;
-            
-            updateUI(); // 載入並顯示該用戶的資料
-        }
-
-
-        // --- II. 資料與記帳核心邏輯 ---
-
-        // 資料管理函數 (根據當前用戶隔離數據)
-        function getCurrentDataKey() {
-            if (!currentUsername) return null;
-            const users = getAllUsers();
-            return users[currentUsername] ? users[currentUsername].dataKey : null;
-        }
-
-        function loadUserData() {
-            const dataKey = getCurrentDataKey();
-            if (!dataKey) return { transactions: [], budgets: {} };
-            const storedData = localStorage.getItem(dataKey);
-            if (storedData) {
-                return JSON.parse(storedData);
-            }
-            return { transactions: [], budgets: {} };
-        }
-
-        function saveUserData(data) {
-            const dataKey = getCurrentDataKey();
-            if (dataKey) {
-                localStorage.setItem(dataKey, JSON.stringify(data));
-            }
-        }
-        
-        // 輔助函數
-        function getCurrentMonthKey() {
-            return new Date().toISOString().substring(0, 7); // YYYY-MM
-        }
-
-        function getCategorySpending(monthKey) {
-            const userData = loadUserData();
-            const monthlySpending = {};
-            const transactions = userData.transactions.filter(t => t.month === monthKey && t.type === '支出');
-            
-            DEFAULT_CATEGORIES.forEach(cat => monthlySpending[cat] = 0);
-
-            transactions.forEach(t => {
-                if (monthlySpending.hasOwnProperty(t.category)) {
-                    monthlySpending[t.category] += t.amount;
-                }
-            });
-            return monthlySpending;
-        }
-
-        // 1. 交易紀錄功能 - 支援多筆連續輸入
-        function handleTransactionSubmit(event) {
-            event.preventDefault(); // 阻止表單默認提交行為 (不會刷新頁面)
-            
-            const dateInput = document.getElementById('date').value;
-            const monthKey = dateInput.substring(0, 7);
-            const userData = loadUserData();
-
-            const newTransaction = {
-                id: Date.now(),
-                type: document.getElementById('type').value,
-                amount: parseFloat(document.getElementById('amount').value),
-                date: dateInput,
-                category: document.getElementById('category').value,
-                note: document.getElementById('note').value,
-                month: monthKey
-            };
-
-            userData.transactions.push(newTransaction);
-            saveUserData(userData);
-            
-            // 關鍵優化：只清空金額和備註
-            document.getElementById('amount').value = ''; 
-            document.getElementById('note').value = ''; 
-
-            updateUI(); // 更新介面，讓使用者看到新紀錄已加入
-        }
-
-        // 3. 預算設定功能
-        function handleBudgetSubmit(event) {
-            event.preventDefault();
-            const monthKey = getCurrentMonthKey();
-            const category = document.getElementById('budgetCategory').value;
-            const amount = parseFloat(document.getElementById('budgetAmount').value);
-            const userData = loadUserData();
-
-            if (!userData.budgets[monthKey]) {
-                userData.budgets[monthKey] = {};
-            }
-
-            userData.budgets[monthKey][category] = amount;
-            saveUserData(userData);
-            document.getElementById('budgetForm').reset();
-            updateUI(); 
-            alert(`${monthKey} 的 ${category} 預算已設定為 ${amount}。`);
-        }
-
-        // 2. 數據呈現與分析
-        function renderBudgetSummary(monthKey, categorySpending) {
-            const tableBody = document.querySelector('#budgetSummaryTable tbody');
-            tableBody.innerHTML = '';
-            const userData = loadUserData();
-            const budgetData = userData.budgets[monthKey] || {};
-            const expenseCategories = DEFAULT_CATEGORIES.filter(cat => cat !== '薪水' && cat !== '投資'); 
-            const relevantCategories = expenseCategories.filter(cat => budgetData[cat] || categorySpending[cat]);
-
-            relevantCategories.forEach(category => {
-                const budget = budgetData[category] || 0;
-                const spent = categorySpending[category] || 0;
-                const remaining = budget - spent;
-                
-                const row = tableBody.insertRow();
-                const overspentClass = remaining < 0 ? 'overspent' : ''; 
-
-                row.insertCell().textContent = category;
-                row.insertCell().textContent = budget.toLocaleString();
-                row.insertCell().textContent = spent.toLocaleString();
-                
-                const remainingCell = row.insertCell();
-                remainingCell.textContent = remaining.toLocaleString();
-                remainingCell.classList.add(overspentClass); 
-            });
-
-            if (relevantCategories.length === 0) {
-                 const row = tableBody.insertRow();
-                 const cell = row.insertCell();
-                 cell.colSpan = 4;
-                 cell.textContent = '本月尚未設定預算或產生支出。';
-                 cell.style.textAlign = 'center';
-            }
-        }
-        
-        let monthlyChartInstance = null;
-        function renderMonthlyChart(monthKey, categorySpending) {
-            const userData = loadUserData();
-            const budgetData = userData.budgets[monthKey] || {};
-            
-            const categories = DEFAULT_CATEGORIES.filter(cat => 
-                (categorySpending[cat] > 0 || budgetData[cat] > 0) && cat !== '薪水' && cat !== '投資'
-            );
-            
-            const spendingData = categories.map(cat => categorySpending[cat] || 0);
-            const budgetLimits = categories.map(cat => budgetData[cat] || 0);
-            
-            const ctx = document.getElementById('monthlyChart').getContext('2d');
-
-            if (monthlyChartInstance) {
-                monthlyChartInstance.destroy();
+            appContent.style.display = 'block';
