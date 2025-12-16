@@ -192,9 +192,19 @@
         }
 
         function loginSuccess() {
-            // **核心切換：隱藏登入介面，顯示記帳區**
-            document.getElementById('auth-overlay').style.display = 'none'; 
-            document.getElementById('app-content').style.display = 'block'; 
+            // **核心切換：強制隱藏登入介面，強制顯示記帳區**
+            const authOverlay = document.getElementById('auth-overlay');
+            const appContent = document.getElementById('app-content');
+
+            authOverlay.style.display = 'none'; 
+            appContent.style.display = 'block'; 
+            
+            // 雙重檢查：如果切換後仍然看不到主介面，可能是 CSS 或其他問題。
+            if (appContent.style.display !== 'block') {
+                 console.error("登入成功但畫面未顯示。可能存在 CSS 衝突。");
+                 alert("登入成功！如果記帳區未出現，請嘗試清除瀏覽器快取 (Ctrl+Shift+R)。");
+            }
+            
             document.getElementById('user-info').textContent = `歡迎您，${currentUsername}！`;
             
             updateUI(); // 載入並顯示該用戶的資料
@@ -345,65 +355,3 @@
 
             if (monthlyChartInstance) {
                 monthlyChartInstance.destroy();
-            }
-
-            monthlyChartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: categories,
-                    datasets: [
-                        {
-                            label: '當月花費 (支出)',
-                            data: spendingData,
-                            backgroundColor: 'rgba(0, 170, 255, 0.6)', 
-                            borderColor: 'rgba(0, 170, 255, 1)',
-                            borderWidth: 1
-                        },
-                        {
-                            label: '每月預算上限',
-                            data: budgetLimits,
-                            backgroundColor: 'rgba(255, 99, 132, 0.6)', 
-                            borderColor: 'rgba(255, 99, 132, 1)',
-                            borderWidth: 1
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    scales: { y: { beginAtZero: true, title: { display: true, text: '金額 (TWD)' } } }
-                }
-            });
-        }
-
-        function renderTransactionRecords() {
-            const userData = loadUserData();
-            const tableBody = document.querySelector('#recordsTable tbody');
-            tableBody.innerHTML = '';
-            
-            const sortedTransactions = [...userData.transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
-
-            sortedTransactions.forEach(t => {
-                const row = tableBody.insertRow();
-                row.insertCell().textContent = t.date;
-                
-                const typeCell = row.insertCell();
-                typeCell.textContent = t.type;
-                typeCell.classList.add(t.type === '收入' ? 'income' : 'expense');
-                
-                row.insertCell().textContent = t.category;
-                row.insertCell().textContent = t.amount.toLocaleString();
-                row.insertCell().textContent = t.note;
-            });
-        }
-        
-        function populateCategorySelectors() {
-            const selectors = [
-                document.getElementById('category'),
-                document.getElementById('budgetCategory')
-            ];
-
-            selectors.forEach(select => {
-                select.innerHTML = '';
-                const fragment = document.createDocumentFragment();
-                
-                const expenseCategories = DEFAULT_CATEGORIES.filter(cat => cat !== '薪水' && cat !== '投資');
