@@ -8,15 +8,24 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     
     <style>
+        /* CSS 變數定義，方便管理顏色 */
+        :root {
+            --main-color: #00aaff; /* 淺藍色 */
+            --main-color-dark: #0088cc; /* 較深的淺藍色 (Hover 效果) */
+            --bg-light: #f4f7f6; /* 柔和背景色 */
+        }
+
         /* 基本樣式設定 */
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; color: #333; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: var(--bg-light); color: #333; }
         .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); }
-        h1, h2 { color: #007bff; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 20px; }
+        h1, h2 { color: var(--main-color); border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 20px; }
         .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
         form { display: flex; flex-direction: column; gap: 15px; }
         input[type="text"], input[type="number"], input[type="date"], input[type="password"], select { padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
-        button { background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; transition: background-color 0.3s; }
-        button:hover { background-color: #0056b3; }
+        
+        /* 按鈕顏色修改為淺藍色 */
+        button { background-color: var(--main-color); color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; transition: background-color 0.3s; }
+        button:hover { background-color: var(--main-color-dark); }
         
         /* 交易列表樣式 */
         #recordsTable { width: 100%; border-collapse: collapse; margin-top: 20px; }
@@ -153,12 +162,12 @@
                 if (users[usernameInput].password === passwordInput) {
                     currentUsername = usernameInput;
                     authMessage.textContent = '';
-                    loginSuccess(); // 成功登入，進入記帳區
+                    loginSuccess(); // <--- 成功登入
                 } else {
                     authMessage.textContent = '密碼錯誤。';
                 }
             } else {
-                // 註冊流程 (檢查帳號唯一性)
+                // 註冊流程
                 
                 // 註冊成功，儲存新帳號
                 users[usernameInput] = {
@@ -169,7 +178,7 @@
                 
                 currentUsername = usernameInput;
                 authMessage.textContent = '';
-                loginSuccess(); // 成功註冊並登入，進入記帳區
+                loginSuccess(); // <--- 成功註冊並登入
                 alert(`帳號 "${usernameInput}" 註冊成功並已自動登入！`);
             }
         }
@@ -183,7 +192,7 @@
         }
 
         function loginSuccess() {
-            // **關鍵步驟：隱藏登入頁面，顯示主程式 (記帳區)**
+            // **核心切換：隱藏登入介面，顯示記帳區**
             document.getElementById('auth-overlay').style.display = 'none'; 
             document.getElementById('app-content').style.display = 'block'; 
             document.getElementById('user-info').textContent = `歡迎您，${currentUsername}！`;
@@ -238,7 +247,7 @@
             return monthlySpending;
         }
 
-        // 1. 交易紀錄功能 - 優化連續輸入
+        // 1. 交易紀錄功能 - 支援多筆連續輸入
         function handleTransactionSubmit(event) {
             event.preventDefault(); // 阻止表單默認提交行為 (不會刷新頁面)
             
@@ -259,18 +268,142 @@
             userData.transactions.push(newTransaction);
             saveUserData(userData);
             
-            // **優化點：清空輸入欄位，但保留日期、類型和類別設定，方便連續輸入**
-            document.getElementById('amount').value = '';
+            // 關鍵優化：只清空金額和備註
+            document.getElementById('amount').value = ''; 
             document.getElementById('note').value = ''; 
-            // document.getElementById('transactionForm').reset(); // 註銷：避免重置所有欄位
 
             updateUI(); // 更新介面，讓使用者看到新紀錄已加入
-            
-            // 讓使用者知道成功了，並且可以繼續輸入
-            // 可視情況增加輕微的反饋，例如 input 欄位短暫變色或閃爍
         }
 
         // 3. 預算設定功能
         function handleBudgetSubmit(event) {
             event.preventDefault();
-            >
+            const monthKey = getCurrentMonthKey();
+            const category = document.getElementById('budgetCategory').value;
+            const amount = parseFloat(document.getElementById('budgetAmount').value);
+            const userData = loadUserData();
+
+            if (!userData.budgets[monthKey]) {
+                userData.budgets[monthKey] = {};
+            }
+
+            userData.budgets[monthKey][category] = amount;
+            saveUserData(userData);
+            document.getElementById('budgetForm').reset();
+            updateUI(); 
+            alert(`${monthKey} 的 ${category} 預算已設定為 ${amount}。`);
+        }
+
+        // 2. 數據呈現與分析
+        function renderBudgetSummary(monthKey, categorySpending) {
+            const tableBody = document.querySelector('#budgetSummaryTable tbody');
+            tableBody.innerHTML = '';
+            const userData = loadUserData();
+            const budgetData = userData.budgets[monthKey] || {};
+            const expenseCategories = DEFAULT_CATEGORIES.filter(cat => cat !== '薪水' && cat !== '投資'); 
+            const relevantCategories = expenseCategories.filter(cat => budgetData[cat] || categorySpending[cat]);
+
+            relevantCategories.forEach(category => {
+                const budget = budgetData[category] || 0;
+                const spent = categorySpending[category] || 0;
+                const remaining = budget - spent;
+                
+                const row = tableBody.insertRow();
+                const overspentClass = remaining < 0 ? 'overspent' : ''; 
+
+                row.insertCell().textContent = category;
+                row.insertCell().textContent = budget.toLocaleString();
+                row.insertCell().textContent = spent.toLocaleString();
+                
+                const remainingCell = row.insertCell();
+                remainingCell.textContent = remaining.toLocaleString();
+                remainingCell.classList.add(overspentClass); 
+            });
+
+            if (relevantCategories.length === 0) {
+                 const row = tableBody.insertRow();
+                 const cell = row.insertCell();
+                 cell.colSpan = 4;
+                 cell.textContent = '本月尚未設定預算或產生支出。';
+                 cell.style.textAlign = 'center';
+            }
+        }
+        
+        let monthlyChartInstance = null;
+        function renderMonthlyChart(monthKey, categorySpending) {
+            const userData = loadUserData();
+            const budgetData = userData.budgets[monthKey] || {};
+            
+            const categories = DEFAULT_CATEGORIES.filter(cat => 
+                (categorySpending[cat] > 0 || budgetData[cat] > 0) && cat !== '薪水' && cat !== '投資'
+            );
+            
+            const spendingData = categories.map(cat => categorySpending[cat] || 0);
+            const budgetLimits = categories.map(cat => budgetData[cat] || 0);
+            
+            const ctx = document.getElementById('monthlyChart').getContext('2d');
+
+            if (monthlyChartInstance) {
+                monthlyChartInstance.destroy();
+            }
+
+            monthlyChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: categories,
+                    datasets: [
+                        {
+                            label: '當月花費 (支出)',
+                            data: spendingData,
+                            backgroundColor: 'rgba(0, 170, 255, 0.6)', 
+                            borderColor: 'rgba(0, 170, 255, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: '每月預算上限',
+                            data: budgetLimits,
+                            backgroundColor: 'rgba(255, 99, 132, 0.6)', 
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: { y: { beginAtZero: true, title: { display: true, text: '金額 (TWD)' } } }
+                }
+            });
+        }
+
+        function renderTransactionRecords() {
+            const userData = loadUserData();
+            const tableBody = document.querySelector('#recordsTable tbody');
+            tableBody.innerHTML = '';
+            
+            const sortedTransactions = [...userData.transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            sortedTransactions.forEach(t => {
+                const row = tableBody.insertRow();
+                row.insertCell().textContent = t.date;
+                
+                const typeCell = row.insertCell();
+                typeCell.textContent = t.type;
+                typeCell.classList.add(t.type === '收入' ? 'income' : 'expense');
+                
+                row.insertCell().textContent = t.category;
+                row.insertCell().textContent = t.amount.toLocaleString();
+                row.insertCell().textContent = t.note;
+            });
+        }
+        
+        function populateCategorySelectors() {
+            const selectors = [
+                document.getElementById('category'),
+                document.getElementById('budgetCategory')
+            ];
+
+            selectors.forEach(select => {
+                select.innerHTML = '';
+                const fragment = document.createDocumentFragment();
+                
+                const expenseCategories = DEFAULT_CATEGORIES.filter(cat => cat !== '薪水' && cat !== '投資');
