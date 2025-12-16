@@ -119,7 +119,7 @@
     <script>
         // 核心設定
         const ALL_USERS_KEY = 'PersonalLedgerUsers'; 
-        const DEFAULT_CATEGORIES = ['餐飲', '交通', '住房', '娛樂', '購物', '薪水', '投資'];
+        const DEFAULT_CATEGORIES = ['餐飲', '交通', '住房', '娛樂', '購物', '薪水', '投資', '其他']; 
 
         let currentUsername = null; 
 
@@ -238,9 +238,10 @@
             return monthlySpending;
         }
 
-        // 1. 交易紀錄功能
+        // 1. 交易紀錄功能 - 優化連續輸入
         function handleTransactionSubmit(event) {
-            event.preventDefault();
+            event.preventDefault(); // 阻止表單默認提交行為 (不會刷新頁面)
+            
             const dateInput = document.getElementById('date').value;
             const monthKey = dateInput.substring(0, 7);
             const userData = loadUserData();
@@ -257,182 +258,19 @@
 
             userData.transactions.push(newTransaction);
             saveUserData(userData);
-            document.getElementById('transactionForm').reset();
-            updateUI(); 
+            
+            // **優化點：清空輸入欄位，但保留日期、類型和類別設定，方便連續輸入**
+            document.getElementById('amount').value = '';
+            document.getElementById('note').value = ''; 
+            // document.getElementById('transactionForm').reset(); // 註銷：避免重置所有欄位
+
+            updateUI(); // 更新介面，讓使用者看到新紀錄已加入
+            
+            // 讓使用者知道成功了，並且可以繼續輸入
+            // 可視情況增加輕微的反饋，例如 input 欄位短暫變色或閃爍
         }
 
         // 3. 預算設定功能
         function handleBudgetSubmit(event) {
             event.preventDefault();
-            const monthKey = getCurrentMonthKey();
-            const category = document.getElementById('budgetCategory').value;
-            const amount = parseFloat(document.getElementById('budgetAmount').value);
-            const userData = loadUserData();
-
-            if (!userData.budgets[monthKey]) {
-                userData.budgets[monthKey] = {};
-            }
-
-            userData.budgets[monthKey][category] = amount;
-            saveUserData(userData);
-            document.getElementById('budgetForm').reset();
-            updateUI(); 
-            alert(`${monthKey} 的 ${category} 預算已設定為 ${amount}。`);
-        }
-
-        // 2. 數據呈現與分析
-        function renderBudgetSummary(monthKey, categorySpending) {
-            const tableBody = document.querySelector('#budgetSummaryTable tbody');
-            tableBody.innerHTML = '';
-            const userData = loadUserData();
-            const budgetData = userData.budgets[monthKey] || {};
-            const relevantCategories = DEFAULT_CATEGORIES.filter(cat => (budgetData[cat] || categorySpending[cat]) && cat !== '薪水' && cat !== '投資');
-
-            relevantCategories.forEach(category => {
-                const budget = budgetData[category] || 0;
-                const spent = categorySpending[category] || 0;
-                const remaining = budget - spent;
-                
-                const row = tableBody.insertRow();
-                const overspentClass = remaining < 0 ? 'overspent' : ''; 
-
-                row.insertCell().textContent = category;
-                row.insertCell().textContent = budget.toLocaleString();
-                row.insertCell().textContent = spent.toLocaleString();
-                
-                const remainingCell = row.insertCell();
-                remainingCell.textContent = remaining.toLocaleString();
-                remainingCell.classList.add(overspentClass); // 超出預算紅字
-            });
-
-            if (relevantCategories.length === 0) {
-                 const row = tableBody.insertRow();
-                 const cell = row.insertCell();
-                 cell.colSpan = 4;
-                 cell.textContent = '本月尚未設定預算或產生支出。';
-                 cell.style.textAlign = 'center';
-            }
-        }
-        
-        let monthlyChartInstance = null;
-        function renderMonthlyChart(monthKey, categorySpending) {
-            const userData = loadUserData();
-            const budgetData = userData.budgets[monthKey] || {};
-            
-            const categories = DEFAULT_CATEGORIES.filter(cat => 
-                (categorySpending[cat] > 0 || budgetData[cat] > 0) && cat !== '薪水' && cat !== '投資'
-            );
-            
-            const spendingData = categories.map(cat => categorySpending[cat] || 0);
-            const budgetLimits = categories.map(cat => budgetData[cat] || 0);
-            
-            const ctx = document.getElementById('monthlyChart').getContext('2d');
-
-            if (monthlyChartInstance) {
-                monthlyChartInstance.destroy();
-            }
-
-            monthlyChartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: categories,
-                    datasets: [
-                        {
-                            label: '當月花費 (支出)',
-                            data: spendingData,
-                            backgroundColor: 'rgba(255, 99, 132, 0.6)',
-                            borderColor: 'rgba(255, 99, 132, 1)',
-                            borderWidth: 1
-                        },
-                        {
-                            label: '每月預算上限',
-                            data: budgetLimits,
-                            backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                            borderColor: 'rgba(54, 162, 235, 1)',
-                            borderWidth: 1
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    scales: { y: { beginAtZero: true, title: { display: true, text: '金額 (TWD)' } } }
-                }
-            });
-        }
-
-        function renderTransactionRecords() {
-            const userData = loadUserData();
-            const tableBody = document.querySelector('#recordsTable tbody');
-            tableBody.innerHTML = '';
-            
-            const sortedTransactions = [...userData.transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
-
-            sortedTransactions.forEach(t => {
-                const row = tableBody.insertRow();
-                row.insertCell().textContent = t.date;
-                
-                const typeCell = row.insertCell();
-                typeCell.textContent = t.type;
-                typeCell.classList.add(t.type === '收入' ? 'income' : 'expense');
-                
-                row.insertCell().textContent = t.category;
-                row.insertCell().textContent = t.amount.toLocaleString();
-                row.insertCell().textContent = t.note;
-            });
-        }
-        
-        function populateCategorySelectors() {
-            const selectors = [
-                document.getElementById('category'),
-                document.getElementById('budgetCategory')
-            ];
-
-            selectors.forEach(select => {
-                select.innerHTML = '';
-                const fragment = document.createDocumentFragment();
-                const expenseCategories = DEFAULT_CATEGORIES.filter(cat => cat !== '薪水' && cat !== '投資'); 
-
-                (select.id === 'category' ? DEFAULT_CATEGORIES : expenseCategories).forEach(cat => {
-                    const option = document.createElement('option');
-                    option.value = cat;
-                    option.textContent = cat;
-                    fragment.appendChild(option);
-                });
-                select.appendChild(fragment);
-            });
-        }
-
-        // 主要更新函數
-        function updateUI() {
-            if (!currentUsername) return;
-            
-            const currentMonthKey = getCurrentMonthKey();
-            document.getElementById('currentMonthText').textContent = currentMonthKey;
-            
-            const categorySpending = getCategorySpending(currentMonthKey);
-
-            renderBudgetSummary(currentMonthKey, categorySpending);
-            renderMonthlyChart(currentMonthKey, categorySpending);
-            renderTransactionRecords();
-        }
-
-
-        // --- 應用程式啟動 ---
-
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('date').value = new Date().toISOString().substring(0, 10);
-            populateCategorySelectors();
-
-            // 註冊所有事件監聽器
-            document.getElementById('authForm').addEventListener('submit', handleAuthSubmit);
-            document.getElementById('transactionForm').addEventListener('submit', handleTransactionSubmit);
-            document.getElementById('budgetForm').addEventListener('submit', handleBudgetSubmit);
-            document.getElementById('logout-btn').addEventListener('click', logout);
-            
-            // 頁面載入時，強制顯示登入/註冊框
-            document.getElementById('auth-overlay').style.display = 'flex';
-        });
-    </script>
-</body>
-</html>
-</html>
+            >
