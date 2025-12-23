@@ -3,482 +3,285 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>個人記帳- 網頁版</title>
+    <title>個人記帳程式 - 專業修復版</title>
     <link rel="icon" href="722320.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     
     <style>
-        /* CSS 變數定義，方便管理顏色 */
         :root {
-            --main-color: #00aaff; /* 淺藍色 */
-            --main-color-dark: #0088cc; /* 較深的淺藍色 (Hover 效果) */
-            --bg-light: #f4f7f6; /* 柔和背景色 */
+            /* 修改為柔和、不刺眼的藍色系 */
+            --main-color: #5c8ab3; /* 柔和灰藍 */
+            --main-color-dark: #4a6e8f; 
+            --bg-light: #f0f2f5; 
+            --text-color: #444;
         }
 
-        /* 基本樣式設定 */
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: var(--bg-light); color: #333; }
-        .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); }
-        h1, h2 { color: var(--main-color); border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 20px; }
+        body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; margin: 0; padding: 20px; background-color: var(--bg-light); color: var(--text-color); }
+        .container { max-width: 950px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); }
+        h1, h2 { color: var(--main-color); border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; margin-top: 20px; }
         .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
-        form { display: flex; flex-direction: column; gap: 15px; }
-        input[type="text"], input[type="number"], input[type="date"], input[type="password"], select { padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
+        form { display: flex; flex-direction: column; gap: 12px; }
+        input, select { padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 15px; outline: none; transition: border 0.3s; }
+        input:focus { border-color: var(--main-color); }
         
-        /* 按鈕顏色修改為淺藍色 */
-        button { background-color: var(--main-color); color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; transition: background-color 0.3s; }
+        button { background-color: var(--main-color); color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.3s; }
         button:hover { background-color: var(--main-color-dark); }
         
-        /* 交易列表樣式 */
         #recordsTable { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        #recordsTable th, #recordsTable td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        #recordsTable th { background-color: #f2f2f2; }
-        .income { color: green; font-weight: bold; }
-        .expense { color: red; font-weight: bold; }
+        #recordsTable th, #recordsTable td { border-bottom: 1px solid #eee; padding: 12px; text-align: left; }
+        #recordsTable th { background-color: #fafafa; color: #666; }
+        .income { color: #2ecc71; font-weight: bold; }
+        .expense { color: #e74c3c; font-weight: bold; }
+        .overspent { color: #e74c3c; font-weight: bold; text-decoration: underline; }
 
-        /* 特殊標示 */
-        .overspent { color: red; font-weight: bold; } /* 超出預算紅字 */
-
-        /* 登入區塊樣式：確保一開始跳出兩行輸入框 */
+        /* 登入區塊 */
         #auth-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; 
-            z-index: 1000;
+            background: rgba(0, 0, 0, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000;
         }
-        #auth-box { background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 0 20px rgba(0, 0, 0, 0.5); text-align: center; }
-        #app-content { display: none; } /* 記帳區默認隱藏 */
-        #logout-btn { background-color: #dc3545; position: absolute; top: 20px; right: 20px; }
+        #auth-box { background: #fff; padding: 40px; border-radius: 12px; width: 320px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        #app-content { display: none; }
+        #logout-btn { background-color: #aeb6bf; margin-bottom: 10px; float: right; padding: 8px 15px; font-size: 14px; }
     </style>
 </head>
 <body>
 
     <div id="auth-overlay">
         <div id="auth-box">
-            <h2>請登入或註冊</h2>
-            <form id="authForm" style="gap: 10px;">
-                <input type="text" id="username" placeholder="帳號" required>
+            <h2>帳號登入</h2>
+            <form id="authForm">
+                <input type="text" id="username" placeholder="使用者名稱" required>
                 <input type="password" id="password" placeholder="密碼" required>
-                <button type="submit" id="loginBtn">登入 / 註冊</button>
-                <p id="auth-message" style="color: red;"></p>
+                <button type="submit">登入 / 註冊</button>
+                <p id="auth-message" style="color: #e74c3c; font-size: 14px;"></p>
             </form>
         </div>
     </div>
 
     <div class="container">
-        <h1 id="app-title">個人記帳程式</h1>
-        <button id="logout-btn">登出</button>
+        <button id="logout-btn">登出系統</button>
+        <h1 id="app-title">個人雲端帳本</h1>
 
         <div id="app-content">
-            <p id="user-info">歡迎您！</p>
+            <p id="user-info" style="font-weight: bold;"></p>
 
             <div class="grid-container">
                 <div>
-                    <h2>1. 交易紀錄 (收入/支出)</h2>
+                    <h2>1. 新增交易紀錄</h2>
                     <form id="transactionForm">
                         <select id="type" required>
                             <option value="支出">支出</option>
                             <option value="收入">收入</option>
                         </select>
-                        <input type="number" id="amount" placeholder="金額 (例如: 500)" min="0.01" step="0.01" required>
+                        <input type="number" id="amount" placeholder="金額" min="0" step="1" required>
                         <input type="date" id="date" required>
                         <select id="category" required>
                             </select>
-                        <input type="text" id="note" placeholder="備註/說明 (例如: 午餐)">
-                        <button type="submit">紀錄交易</button>
+                        <input type="text" id="note" placeholder="備註 (選填)">
+                        <button type="submit">確認儲存</button>
                     </form>
 
-                    <h2>3. 預算設定 (當月)</h2>
+                    <h2>3. 每月預算設定</h2>
                     <form id="budgetForm">
                         <select id="budgetCategory" required>
                             </select>
-                        <input type="number" id="budgetAmount" placeholder="每月預算上限" min="1" step="1" required>
-                        <button type="submit">設定/更新預算</button>
+                        <input type="number" id="budgetAmount" placeholder="設定預算上限" min="0" required>
+                        <button type="submit">設定預算</button>
                     </form>
                 </div>
 
                 <div>
-                    <h2>2. 當月開支報告與預算追蹤</h2>
-                    <p>目前月份：<strong id="currentMonthText"></strong></p>
-                    <table id="budgetSummaryTable" style="width:100%; margin-bottom: 20px;">
-                        <thead><tr><th>類別</th><th>預算</th><th>已花費</th><th>結餘</th></tr></thead>
-                        <tbody>
-                            </tbody>
+                    <h2>2. 當月預算分析</h2>
+                    <p>統計月份：<span id="currentMonthText" style="color: var(--main-color); font-weight: bold;"></span></p>
+                    <table id="budgetSummaryTable" style="width:100%; font-size: 14px;">
+                        <thead><tr><th>類別</th><th>預算</th><th>實支</th><th>剩餘</th></tr></thead>
+                        <tbody></tbody>
                     </table>
-                    
-                    <h3>當月支出長條圖 </h3>
-                    <canvas id="monthlyChart"></canvas>
+                    <br>
+                    <canvas id="monthlyChart" style="max-height: 250px;"></canvas>
                 </div>
             </div>
             
-            <h2>歷史交易列表</h2>
+            <h2>歷史交易清單 (所有紀錄)</h2>
             <table id="recordsTable">
                 <thead>
-                    <tr>
-                        <th>日期</th>
-                        <th>類型</th>
-                        <th>類別</th>
-                        <th>金額</th>
-                        <th>備註</th>
-                    </tr>
+                    <tr><th>日期</th><th>類型</th><th>類別</th><th>金額</th><th>備註</th></tr>
                 </thead>
-                <tbody>
-                    </tbody>
+                <tbody></tbody>
             </table>
         </div>
     </div>
 
     <script>
-        // 核心設定
-        const ALL_USERS_KEY = 'PersonalLedgerUsers'; 
-        const DEFAULT_CATEGORIES = ['餐飲', '交通', '住房', '娛樂', '購物', '薪水', '投資', '其他']; 
+        const ALL_USERS_KEY = 'LedgerApp_Users';
+        // 完整的類別定義
+        const EXPENSE_CATS = ['餐飲', '交通', '住房', '娛樂', '購物', '其他'];
+        const INCOME_CATS = ['薪水', '投資'];
+        const ALL_CATS = [...EXPENSE_CATS, ...INCOME_CATS];
 
-        let currentUsername = null; 
+        let currentUsername = null;
 
-        // --- I. 帳號登入/註冊邏輯 ---
+        // --- 登入邏輯 ---
+        document.getElementById('authForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const u = document.getElementById('username').value.trim();
+            const p = document.getElementById('password').value;
+            const msg = document.getElementById('auth-message');
+            const users = JSON.parse(localStorage.getItem(ALL_USERS_KEY) || '{}');
 
-        function getAllUsers() {
-            const usersJson = localStorage.getItem(ALL_USERS_KEY);
-            return usersJson ? JSON.parse(usersJson) : {};
-        }
-
-        function saveAllUsers(users) {
-            localStorage.setItem(ALL_USERS_KEY, JSON.stringify(users));
-        }
-
-        function handleAuthSubmit(event) {
-            event.preventDefault();
-            
-            const usernameInput = document.getElementById('username').value.trim();
-            const passwordInput = document.getElementById('password').value;
-            const authMessage = document.getElementById('auth-message');
-            const usernameField = document.getElementById('username');
-            const passwordField = document.getElementById('password');
-            
-            const users = getAllUsers();
-
-            if (!usernameInput || !passwordInput) {
-                authMessage.textContent = '帳號和密碼不能為空。';
-                return;
-            }
-
-            if (users.hasOwnProperty(usernameInput)) {
-                // 登入流程
-                if (users[usernameInput].password === passwordInput) {
-                    currentUsername = usernameInput;
-                    authMessage.textContent = '';
-                    usernameField.value = ''; // 登入成功後清空欄位
-                    passwordField.value = '';
-                    loginSuccess(); 
+            if (users[u]) {
+                if (users[u].password === p) {
+                    currentUsername = u;
+                    loginSuccess();
                 } else {
-                    authMessage.textContent = '密碼錯誤。';
+                    msg.textContent = '密碼錯誤！';
                 }
             } else {
-                // 註冊流程
-                
-                // 註冊成功，儲存新帳號
-                users[usernameInput] = {
-                    password: passwordInput,
-                    dataKey: `LedgerData_${usernameInput}`
-                };
-                saveAllUsers(users);
-                
-                currentUsername = usernameInput;
-                authMessage.textContent = '';
-                usernameField.value = ''; // 註冊成功後清空欄位
-                passwordField.value = '';
-                loginSuccess(); 
-                alert(`帳號 "${usernameInput}" 註冊成功並已自動登入！`);
+                users[u] = { password: p, data: { transactions: [], budgets: {} } };
+                localStorage.setItem(ALL_USERS_KEY, JSON.stringify(users));
+                currentUsername = u;
+                loginSuccess();
+                alert('帳號已成功註冊並登入！');
             }
-        }
-        
-        function logout() {
-            currentUsername = null;
-            document.getElementById('auth-overlay').style.display = 'flex';
-            document.getElementById('app-content').style.display = 'none';
-            document.getElementById('username').value = '';
-            document.getElementById('password').value = '';
-        }
+        });
 
         function loginSuccess() {
-            const authOverlay = document.getElementById('auth-overlay');
-            const appContent = document.getElementById('app-content');
-
-            // **關鍵修復點 1: 立即設定顯示/隱藏**
-            authOverlay.style.display = 'none'; 
-            appContent.style.display = 'block'; 
-            
-            // **關鍵修復點 2: 使用 setTimeout 確保瀏覽器重新渲染 (強制切換)**
-            setTimeout(() => {
-                authOverlay.style.display = 'none'; 
-                appContent.style.display = 'block'; 
-                
-                // 確認畫面切換是否成功
-                if (appContent.style.display !== 'block') {
-                     console.error("登入成功但畫面未顯示。請檢查 CSS 或重新載入。");
-                     alert("登入成功！如果記帳區未出現，請進行 'Ctrl+Shift+R' 硬式重新載入。");
-                } else {
-                    document.getElementById('user-info').textContent = `歡迎您，${currentUsername}！`;
-                    updateUI(); // 載入並顯示該用戶的資料
-                }
-            }, 50); // 延遲 50 毫秒
+            document.getElementById('auth-overlay').style.display = 'none';
+            document.getElementById('app-content').style.display = 'block';
+            document.getElementById('user-info').textContent = `你好, ${currentUsername}。今天過得如何？`;
+            initApp();
         }
 
+        document.getElementById('logout-btn').addEventListener('click', () => location.reload());
 
-        // --- II. 資料與記帳核心邏輯 ---
-
-        // 資料管理函數 (根據當前用戶隔離數據)
-        function getCurrentDataKey() {
-            if (!currentUsername) return null;
-            const users = getAllUsers();
-            return users[currentUsername] ? users[currentUsername].dataKey : null;
-        }
-
-        function loadUserData() {
-            const dataKey = getCurrentDataKey();
-            if (!dataKey) return { transactions: [], budgets: {} };
-            const storedData = localStorage.getItem(dataKey);
-            if (storedData) {
-                return JSON.parse(storedData);
-            }
-            return { transactions: [], budgets: {} };
+        // --- 核心功能 ---
+        function getUserData() {
+            const users = JSON.parse(localStorage.getItem(ALL_USERS_KEY));
+            return users[currentUsername].data;
         }
 
         function saveUserData(data) {
-            const dataKey = getCurrentDataKey();
-            if (dataKey) {
-                localStorage.setItem(dataKey, JSON.stringify(data));
-            }
-        }
-        
-        // 輔助函數
-        function getCurrentMonthKey() {
-            return new Date().toISOString().substring(0, 7); // YYYY-MM
+            const users = JSON.parse(localStorage.getItem(ALL_USERS_KEY));
+            users[currentUsername].data = data;
+            localStorage.setItem(ALL_USERS_KEY, JSON.stringify(users));
         }
 
-        function getCategorySpending(monthKey) {
-            const userData = loadUserData();
-            const monthlySpending = {};
-            const transactions = userData.transactions.filter(t => t.month === monthKey && t.type === '支出');
+        function initApp() {
+            // 初始化日期
+            document.getElementById('date').value = new Date().toISOString().substring(0, 10);
             
-            DEFAULT_CATEGORIES.forEach(cat => monthlySpending[cat] = 0);
-
-            transactions.forEach(t => {
-                if (monthlySpending.hasOwnProperty(t.category)) {
-                    monthlySpending[t.category] += t.amount;
-                }
-            });
-            return monthlySpending;
+            // 初始化下拉選單
+            const catSelect = document.getElementById('category');
+            const bugSelect = document.getElementById('budgetCategory');
+            catSelect.innerHTML = ALL_CATS.map(c => `<option value="${c}">${c}</option>`).join('');
+            bugSelect.innerHTML = EXPENSE_CATS.map(c => `<option value="${c}">${c}</option>`).join('');
+            
+            updateUI();
         }
 
-        // 1. 交易紀錄功能 - 支援多筆連續輸入
-        function handleTransactionSubmit(event) {
-            event.preventDefault(); // 阻止表單默認提交行為 (不會刷新頁面)
+        // 提交交易：修復多筆輸入問題
+        document.getElementById('transactionForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const data = getUserData();
+            const dateVal = document.getElementById('date').value;
             
-            const dateInput = document.getElementById('date').value;
-            // 必須確認金額是有效的數字
-            const amountValue = parseFloat(document.getElementById('amount').value);
-            if (isNaN(amountValue) || amountValue <= 0) {
-                 alert('請輸入有效的金額！');
-                 return;
-            }
-
-            const monthKey = dateInput.substring(0, 7);
-            const userData = loadUserData();
-
-            const newTransaction = {
+            const newRecord = {
                 id: Date.now(),
                 type: document.getElementById('type').value,
-                amount: amountValue,
-                date: dateInput,
+                amount: parseInt(document.getElementById('amount').value),
                 category: document.getElementById('category').value,
                 note: document.getElementById('note').value,
-                month: monthKey
+                date: dateVal,
+                month: dateVal.substring(0, 7)
             };
 
-            userData.transactions.push(newTransaction);
-            saveUserData(userData);
+            data.transactions.push(newRecord);
+            saveUserData(data);
+
+            // 清空金額與備註，保留日期與類別，方便下一筆
+            document.getElementById('amount').value = '';
+            document.getElementById('note').value = '';
             
-            // 關鍵優化：只清空金額和備註
-            document.getElementById('amount').value = ''; 
-            document.getElementById('note').value = ''; 
+            updateUI();
+        });
 
-            updateUI(); // 更新介面，讓使用者看到新紀錄已加入
-        }
+        // 提交預算：修復全種類設定問題
+        document.getElementById('budgetForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const data = getUserData();
+            const month = new Date().toISOString().substring(0, 7);
+            const cat = document.getElementById('budgetCategory').value;
+            const amt = parseInt(document.getElementById('budgetAmount').value);
 
-        // 3. 預算設定功能
-        function handleBudgetSubmit(event) {
-            event.preventDefault();
-            const monthKey = getCurrentMonthKey();
-            const category = document.getElementById('budgetCategory').value;
-            const amount = parseFloat(document.getElementById('budgetAmount').value);
-            const userData = loadUserData();
+            if (!data.budgets[month]) data.budgets[month] = {};
+            data.budgets[month][cat] = amt;
+            
+            saveUserData(data);
+            alert(`${cat} 預算已設定為 ${amt}`);
+            updateUI();
+        });
 
-            if (!userData.budgets[monthKey]) {
-                userData.budgets[monthKey] = {};
-            }
+        let chart = null;
+        function updateUI() {
+            const data = getUserData();
+            const currentMonth = new Date().toISOString().substring(0, 7);
+            document.getElementById('currentMonthText').textContent = currentMonth;
 
-            userData.budgets[monthKey][category] = amount;
-            saveUserData(userData);
-            document.getElementById('budgetForm').reset();
-            updateUI(); 
-            alert(`${monthKey} 的 ${category} 預算已設定為 ${amount}。`);
-        }
-
-        // 2. 數據呈現與分析 (略過不變)
-        function renderBudgetSummary(monthKey, categorySpending) {
-            const tableBody = document.querySelector('#budgetSummaryTable tbody');
-            tableBody.innerHTML = '';
-            const userData = loadUserData();
-            const budgetData = userData.budgets[monthKey] || {};
-            const expenseCategories = DEFAULT_CATEGORIES.filter(cat => cat !== '薪水' && cat !== '投資'); 
-            const relevantCategories = expenseCategories.filter(cat => budgetData[cat] || categorySpending[cat]);
-
-            relevantCategories.forEach(category => {
-                const budget = budgetData[category] || 0;
-                const spent = categorySpending[category] || 0;
-                const remaining = budget - spent;
-                
-                const row = tableBody.insertRow();
-                const overspentClass = remaining < 0 ? 'overspent' : ''; 
-
-                row.insertCell().textContent = category;
-                row.insertCell().textContent = budget.toLocaleString();
-                row.insertCell().textContent = spent.toLocaleString();
-                
-                const remainingCell = row.insertCell();
-                remainingCell.textContent = remaining.toLocaleString();
-                remainingCell.classList.add(overspentClass); 
+            // 1. 歷史清單：修復顯示限制
+            const tbody = document.querySelector('#recordsTable tbody');
+            tbody.innerHTML = '';
+            [...data.transactions].reverse().forEach(t => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${t.date}</td>
+                    <td class="${t.type === '收入' ? 'income' : 'expense'}">${t.type}</td>
+                    <td>${t.category}</td>
+                    <td>${t.amount.toLocaleString()}</td>
+                    <td style="color:#888; font-size:13px;">${t.note}</td>
+                `;
             });
 
-            if (relevantCategories.length === 0) {
-                 const row = tableBody.insertRow();
-                 const cell = row.insertCell();
-                 cell.colSpan = 4;
-                 cell.textContent = '本月尚未設定預算或產生支出。';
-                 cell.style.textAlign = 'center';
-            }
-        }
-        
-        let monthlyChartInstance = null;
-        function renderMonthlyChart(monthKey, categorySpending) {
-            const userData = loadUserData();
-            const budgetData = userData.budgets[monthKey] || {};
+            // 2. 預算統計
+            const summaryBody = document.querySelector('#budgetSummaryTable tbody');
+            summaryBody.innerHTML = '';
+            const monthlyBudgets = data.budgets[currentMonth] || {};
+            const monthlySpending = {};
             
-            const categories = DEFAULT_CATEGORIES.filter(cat => 
-                (categorySpending[cat] > 0 || budgetData[cat] > 0) && cat !== '薪水' && cat !== '投資'
-            );
-            
-            const spendingData = categories.map(cat => categorySpending[cat] || 0);
-            const budgetLimits = categories.map(cat => budgetData[cat] || 0);
-            
-            const ctx = document.getElementById('monthlyChart').getContext('2d');
+            EXPENSE_CATS.forEach(c => monthlySpending[c] = 0);
+            data.transactions.filter(t => t.month === currentMonth && t.type === '支出').forEach(t => {
+                monthlySpending[t.category] += t.amount;
+            });
 
-            if (monthlyChartInstance) {
-                monthlyChartInstance.destroy();
-            }
-
-            monthlyChartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: categories,
-                    datasets: [
-                        {
-                            label: '當月花費 (支出)',
-                            data: spendingData,
-                            backgroundColor: 'rgba(0, 170, 255, 0.6)', 
-                            borderColor: 'rgba(0, 170, 255, 1)',
-                            borderWidth: 1
-                        },
-                        {
-                            label: '每月預算上限',
-                            data: budgetLimits,
-                            backgroundColor: 'rgba(255, 99, 132, 0.6)', 
-                            borderColor: 'rgba(255, 99, 132, 1)',
-                            borderWidth: 1
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    scales: { y: { beginAtZero: true, title: { display: true, text: '金額 (TWD)' } } }
+            EXPENSE_CATS.forEach(cat => {
+                if (monthlyBudgets[cat] || monthlySpending[cat] > 0) {
+                    const budget = monthlyBudgets[cat] || 0;
+                    const spent = monthlySpending[cat];
+                    const remain = budget - spent;
+                    const row = summaryBody.insertRow();
+                    row.innerHTML = `
+                        <td>${cat}</td>
+                        <td>${budget}</td>
+                        <td>${spent}</td>
+                        <td class="${remain < 0 ? 'overspent' : ''}">${remain}</td>
+                    `;
                 }
             });
-        }
 
-        function renderTransactionRecords() {
-            const userData = loadUserData();
-            const tableBody = document.querySelector('#recordsTable tbody');
-            tableBody.innerHTML = '';
-            
-            const sortedTransactions = [...userData.transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
-
-            sortedTransactions.forEach(t => {
-                const row = tableBody.insertRow();
-                row.insertCell().textContent = t.date;
-                
-                const typeCell = row.insertCell();
-                typeCell.textContent = t.type;
-                typeCell.classList.add(t.type === '收入' ? 'income' : 'expense');
-                
-                row.insertCell().textContent = t.category;
-                row.insertCell().textContent = t.amount.toLocaleString();
-                row.insertCell().textContent = t.note;
+            // 3. 圖表更新
+            const ctx = document.getElementById('monthlyChart').getContext('2d');
+            if (chart) chart.destroy();
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: EXPENSE_CATS,
+                    datasets: [
+                        { label: '支出', data: EXPENSE_CATS.map(c => monthlySpending[c]), backgroundColor: '#5c8ab3' },
+                        { label: '預算', data: EXPENSE_CATS.map(c => monthlyBudgets[c] || 0), backgroundColor: '#d5dbdb' }
+                    ]
+                },
+                options: { responsive: true, scales: { y: { beginAtZero: true } } }
             });
         }
-        
-        function populateCategorySelectors() {
-            const selectors = [
-                document.getElementById('category'),
-                document.getElementById('budgetCategory')
-            ];
-
-            selectors.forEach(select => {
-                select.innerHTML = '';
-                const fragment = document.createDocumentFragment();
-                
-                const expenseCategories = DEFAULT_CATEGORIES.filter(cat => cat !== '薪水' && cat !== '投資'); 
-
-                const categoriesToUse = select.id === 'category' ? DEFAULT_CATEGORIES : expenseCategories;
-                
-                categoriesToUse.forEach(cat => {
-                    const option = document.createElement('option');
-                    option.value = cat;
-                    option.textContent = cat;
-                    fragment.appendChild(option);
-                });
-                select.appendChild(fragment);
-            });
-        }
-
-        // 主要更新函數
-        function updateUI() {
-            if (!currentUsername) return;
-            
-            const currentMonthKey = getCurrentMonthKey();
-            document.getElementById('currentMonthText').textContent = currentMonthKey;
-            
-            const categorySpending = getCategorySpending(currentMonthKey);
-
-            renderBudgetSummary(currentMonthKey, categorySpending);
-            renderMonthlyChart(currentMonthKey, categorySpending);
-            renderTransactionRecords();
-        }
-
-
-        // --- 應用程式啟動 ---
-
-        document.addEventListener('DOMContentLoaded', () => {
-            // 確保日期預設為今日
-            document.getElementById('date').value = new Date().toISOString().substring(0, 10);
-            populateCategorySelectors();
-
-            // 註冊所有事件監聽器
-            document.getElementById('authForm').addEventListener('submit', handleAuthSubmit);
-            document.getElementById('transactionForm').addEventListener('submit', handleTransactionSubmit);
-            document.getElementById('budgetForm').addEventListener('submit', handleBudgetSubmit);
-            document.getElementById('logout-btn').addEventListener('click', logout);
-            
-            // 頁面載入時，強制顯示登入/註冊框
-            document.getElementById('auth-overlay').style.display = 'flex';
-        });
     </script>
 </body>
 </html>
