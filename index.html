@@ -3,137 +3,136 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>個人雲端帳本 - 財務分析版</title>
-    <link rel="icon" href="722320.png">
+    <title>個人雲端帳本 - 最終修復版</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     
     <style>
         :root {
-            --main-color: #5c8ab3; /* 柔和灰藍 */
+            --main-color: #5c8ab3; /* 灰藍色 */
             --main-color-dark: #4a6e8f; 
-            --bg-light: #f0f2f5; 
-            --text-color: #444;
-            --income-color: #2ecc71;
-            --expense-color: #e74c3c;
+            --bg-light: #f4f7f9; 
+            --income-green: #2ecc71;
+            --expense-red: #e74c3c;
         }
 
-        body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; margin: 0; padding: 20px; background-color: var(--bg-light); color: var(--text-color); }
-        .container { max-width: 1000px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); }
-        h1, h2 { color: var(--main-color); border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; margin-top: 20px; }
-        .grid-container { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 30px; }
-        form { display: flex; flex-direction: column; gap: 12px; }
-        input, select { padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 15px; outline: none; }
+        body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; margin: 0; padding: 20px; background-color: var(--bg-light); color: #333; }
+        .container { max-width: 1000px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); position: relative; }
         
-        button { background-color: var(--main-color); color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.3s; }
-        button:hover { background-color: var(--main-color-dark); }
-        
-        /* 表格樣式 */
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border-bottom: 1px solid #eee; padding: 12px; text-align: left; }
-        th { background-color: #fafafa; color: #666; font-size: 14px; }
-        
-        .income { color: var(--income-color); font-weight: bold; }
-        .expense { color: var(--expense-color); font-weight: bold; }
-        .overspent { color: var(--expense-color); font-weight: bold; text-decoration: underline; }
-
-        /* 結算區塊樣式 */
-        .settlement-card {
-            background: #f8fbff; border: 1px solid #dce7f3; padding: 20px; border-radius: 10px; margin-top: 20px;
-            display: flex; justify-content: space-around; align-items: center; text-align: center;
-        }
-        .settlement-item h3 { margin: 0; font-size: 14px; color: #777; }
-        .settlement-item p { margin: 5px 0 0 0; font-size: 24px; font-weight: bold; }
-
-        /* 登入區塊 */
+        /* 登入覆蓋層 - 修正為最高優先權 */
         #auth-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(0, 0, 0, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000;
+            background: rgba(44, 62, 80, 0.95); display: flex; justify-content: center; align-items: center; 
+            z-index: 9999; visibility: visible; transition: 0.3s;
         }
-        #auth-box { background: #fff; padding: 40px; border-radius: 12px; width: 320px; text-align: center; }
-        #app-content { display: none; }
-        #logout-btn { background-color: #aeb6bf; float: right; padding: 8px 15px; font-size: 14px; }
+        #auth-box { background: white; padding: 40px; border-radius: 15px; width: 350px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+        
+        /* 主內容區 - 預設隱藏 */
+        #app-content { display: none; } 
+
+        h1, h2 { color: var(--main-color); border-bottom: 2px solid #eee; padding-bottom: 8px; }
+        .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        form { display: flex; flex-direction: column; gap: 10px; }
+        input, select { padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 15px; }
+        button { background-color: var(--main-color); color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        button:hover { background-color: var(--main-color-dark); }
+
+        /* 表格與列表 */
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+        th, td { border-bottom: 1px solid #eee; padding: 12px; text-align: left; }
+        th { background-color: #f9f9f9; color: #666; }
+        .income-text { color: var(--income-green); font-weight: bold; }
+        .expense-text { color: var(--expense-red); font-weight: bold; }
+
+        /* 第四點：當月結算卡片 */
+        .summary-panel {
+            background: #fff; border: 2px solid var(--main-color); padding: 20px; border-radius: 12px;
+            margin: 20px 0; display: flex; justify-content: space-around; align-items: center;
+        }
+        .summary-item { text-align: center; }
+        .summary-item label { font-size: 14px; color: #888; display: block; }
+        .summary-item span { font-size: 24px; font-weight: bold; }
+
+        #logout-btn { background-color: #95a5a6; float: right; padding: 8px 15px; font-size: 13px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
     <div id="auth-overlay">
         <div id="auth-box">
-            <h2>帳號登入</h2>
+            <h2 style="margin-top:0;">帳號登入 / 註冊</h2>
+            <p style="font-size: 13px; color: #7f8c8d;">初次使用請直接輸入想設定的帳密</p>
             <form id="authForm">
                 <input type="text" id="username" placeholder="使用者名稱" required>
                 <input type="password" id="password" placeholder="密碼" required>
-                <button type="submit">登入 / 註冊</button>
-                <p id="auth-message" style="color: #e74c3c; font-size: 14px;"></p>
+                <button type="submit" id="loginBtn">確認進入系統</button>
+                <p id="auth-message" style="color: var(--expense-red); font-size: 14px; margin-top:10px;"></p>
             </form>
         </div>
     </div>
 
     <div class="container">
         <button id="logout-btn">登出</button>
-        <h1 id="app-title">個人財務帳本</h1>
+        <h1 style="margin-top:0;">雲端財務管理系統</h1>
 
         <div id="app-content">
-            <p id="user-info"></p>
-
             <div class="grid-container">
                 <div>
                     <h2>1. 新增交易</h2>
                     <form id="transactionForm">
-                        <select id="type" required>
+                        <select id="type">
                             <option value="支出">支出</option>
                             <option value="收入">收入</option>
                         </select>
-                        <input type="number" id="amount" placeholder="金額" min="0" required>
+                        <input type="number" id="amount" placeholder="金額" required>
                         <input type="date" id="date" required>
-                        <select id="category" required></select>
+                        <select id="category"></select>
                         <input type="text" id="note" placeholder="備註 (選填)">
                         <button type="submit">儲存紀錄</button>
                     </form>
 
                     <h2>3. 預算上限設定</h2>
                     <form id="budgetForm">
-                        <select id="budgetCategory" required></select>
-                        <input type="number" id="budgetAmount" placeholder="設定該類別月預算" min="0" required>
-                        <button type="submit">儲存預算</button>
+                        <select id="budgetCategory"></select>
+                        <input type="number" id="budgetAmount" placeholder="設定月預算" required>
+                        <button type="submit" style="background-color: #7f8c8d;">更新預算</button>
                     </form>
                 </div>
 
                 <div>
                     <h2>2. 當月預算分析</h2>
-                    <p>月份：<span id="currentMonthText" style="font-weight:bold;"></span></p>
-                    <p id="income-summary" style="font-size: 14px; background: #eef9f1; padding: 8px; border-radius: 5px;">
-                        本月可用薪資：<span id="monthly-salary-val" class="income">0</span>
-                    </p>
-                    <table id="budgetSummaryTable">
+                    <p>統計月份：<span id="currentMonthLabel" style="font-weight:bold; color:var(--main-color);"></span></p>
+                    <table id="analysisTable">
                         <thead>
                             <tr><th>類別</th><th>預算</th><th>實支</th><th>預算剩餘</th></tr>
                         </thead>
                         <tbody></tbody>
                     </table>
-                    <canvas id="monthlyChart" style="margin-top:20px; max-height: 200px;"></canvas>
+                    <div style="height: 200px; margin-top:20px;">
+                        <canvas id="monthlyChart"></canvas>
+                    </div>
                 </div>
             </div>
 
             <h2>4. 當月財務結算</h2>
-            <div class="settlement-card">
-                <div class="settlement-item">
-                    <h3>當月總收入</h3>
-                    <p id="total-income-val" class="income">0</p>
+            <div class="summary-panel">
+                <div class="summary-item">
+                    <label>總收入 (薪水+投資)</label>
+                    <span id="stat-income" class="income-text">0</span>
                 </div>
-                <div style="font-size: 30px; color: #ccc;">-</div>
-                <div class="settlement-item">
-                    <h3>當月總支出</h3>
-                    <p id="total-expense-val" class="expense">0</p>
+                <div style="font-size: 30px; color: #eee;">|</div>
+                <div class="summary-item">
+                    <label>總支出</label>
+                    <span id="stat-expense" class="expense-text">0</span>
                 </div>
-                <div style="font-size: 30px; color: #ccc;">=</div>
-                <div class="settlement-item">
-                    <h3>本月剩餘結餘</h3>
-                    <p id="total-balance-val" style="color: var(--main-color);">0</p>
+                <div style="font-size: 30px; color: #eee;">|</div>
+                <div class="summary-item">
+                    <label>本月結餘 (剩餘存款)</label>
+                    <span id="stat-balance" style="color:var(--main-color);">0</span>
                 </div>
             </div>
-            
-            <h2>歷史交易清單</h2>
-            <table id="recordsTable">
+
+            <h2>歷史交易清單 (所有紀錄)</h2>
+            <table id="historyTable">
                 <thead>
                     <tr><th>日期</th><th>類型</th><th>類別</th><th>金額</th><th>備註</th></tr>
                 </thead>
@@ -143,108 +142,12 @@
     </div>
 
     <script>
-        const ALL_USERS_KEY = 'LedgerApp_Pro_Users';
-        const EXPENSE_CATS = ['餐飲', '交通', '住房', '娛樂', '購物', '其他'];
-        const INCOME_CATS = ['薪水', '投資'];
-        const ALL_CATS = [...EXPENSE_CATS, ...INCOME_CATS];
+        // 設定與類別
+        const ALL_USERS_KEY = 'LEDGER_PRO_SYSTEM_DATA';
+        const EX_CATS = ['餐飲', '交通', '住房', '娛樂', '購物', '其他'];
+        const IN_CATS = ['薪水', '投資'];
+        let currentUser = null;
+        let myChart = null;
 
-        let currentUsername = null;
-
-        // 登入邏輯
-        document.getElementById('authForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const u = document.getElementById('username').value.trim();
-            const p = document.getElementById('password').value;
-            const msg = document.getElementById('auth-message');
-            const users = JSON.parse(localStorage.getItem(ALL_USERS_KEY) || '{}');
-
-            if (users[u]) {
-                if (users[u].password === p) {
-                    currentUsername = u;
-                    loginSuccess();
-                } else { msg.textContent = '密碼錯誤！'; }
-            } else {
-                users[u] = { password: p, data: { transactions: [], budgets: {} } };
-                localStorage.setItem(ALL_USERS_KEY, JSON.stringify(users));
-                currentUsername = u;
-                loginSuccess();
-            }
-        });
-
-        function loginSuccess() {
-            document.getElementById('auth-overlay').style.display = 'none';
-            document.getElementById('app-content').style.display = 'block';
-            document.getElementById('user-info').textContent = `歡迎回來，${currentUsername}`;
-            initApp();
-        }
-
-        document.getElementById('logout-btn').addEventListener('click', () => location.reload());
-
-        function getUserData() {
-            const users = JSON.parse(localStorage.getItem(ALL_USERS_KEY));
-            return users[currentUsername].data;
-        }
-
-        function saveUserData(data) {
-            const users = JSON.parse(localStorage.getItem(ALL_USERS_KEY));
-            users[currentUsername].data = data;
-            localStorage.setItem(ALL_USERS_KEY, JSON.stringify(users));
-        }
-
-        function initApp() {
-            document.getElementById('date').value = new Date().toISOString().substring(0, 10);
-            document.getElementById('category').innerHTML = ALL_CATS.map(c => `<option value="${c}">${c}</option>`).join('');
-            document.getElementById('budgetCategory').innerHTML = EXPENSE_CATS.map(c => `<option value="${c}">${c}</option>`).join('');
-            updateUI();
-        }
-
-        document.getElementById('transactionForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const data = getUserData();
-            const dateVal = document.getElementById('date').value;
-            data.transactions.push({
-                id: Date.now(),
-                type: document.getElementById('type').value,
-                amount: parseInt(document.getElementById('amount').value),
-                category: document.getElementById('category').value,
-                note: document.getElementById('note').value,
-                date: dateVal,
-                month: dateVal.substring(0, 7)
-            });
-            saveUserData(data);
-            document.getElementById('amount').value = '';
-            document.getElementById('note').value = '';
-            updateUI();
-        });
-
-        document.getElementById('budgetForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const data = getUserData();
-            const month = new Date().toISOString().substring(0, 7);
-            const cat = document.getElementById('budgetCategory').value;
-            data.budgets[month] = data.budgets[month] || {};
-            data.budgets[month][cat] = parseInt(document.getElementById('budgetAmount').value);
-            saveUserData(data);
-            alert('預算更新成功');
-            updateUI();
-        });
-
-        let chart = null;
-        function updateUI() {
-            const data = getUserData();
-            const currentMonth = new Date().toISOString().substring(0, 7);
-            document.getElementById('currentMonthText').textContent = currentMonth;
-
-            // 計算當月數據
-            let totalIncome = 0;
-            let totalExpense = 0;
-            let monthlySalary = 0;
-            const spendingByCat = {};
-            EXPENSE_CATS.forEach(c => spendingByCat[c] = 0);
-
-            data.transactions.filter(t => t.month === currentMonth).forEach(t => {
-                if (t.type === '收入') {
-                    totalIncome += t.amount;
-                    if (t.category === '薪水') monthlySalary += t.amount;
-                } else {
-                    totalExpense += t.amount
+        // --- 登入修復邏輯 ---
+        document.getElementById('authForm').addEventListener('submit', function(e
