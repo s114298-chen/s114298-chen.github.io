@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>個人記帳本 - 網頁版</title>
-    <link rel="icon" href="722320.png">
+    <title>個人雲端帳本 - 月份分頁版</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
         :root {
-            --main-color: #5c8ab3; /* 柔和灰藍色，不刺眼 */
+            --main-color: #5c8ab3; /* 柔和灰藍色 */
             --main-bg: #f5f7f9;
             --income-color: #2ecc71;
             --expense-color: #e74c3c;
@@ -17,14 +16,13 @@
         body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; background: var(--main-bg); color: #333; margin: 0; padding: 20px; }
         .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         
-        /* 登入介面 - 強化顯示層級 */
+        /* 登入介面 */
         #auth-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
             background: #2c3e50; display: flex; justify-content: center; align-items: center; z-index: 9999;
         }
         .auth-box { background: white; padding: 40px; border-radius: 15px; width: 320px; text-align: center; }
         
-        /* 記帳區 - 預設隱藏 */
         #app-content { display: none; }
 
         h1, h2 { color: var(--main-color); border-bottom: 2px solid #eee; padding-bottom: 10px; }
@@ -32,15 +30,21 @@
         form { display: flex; flex-direction: column; gap: 12px; }
         input, select { padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 15px; }
         button { background: var(--main-color); color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; }
-        button:hover { opacity: 0.9; }
+        
+        /* 月份切換列 */
+        .month-nav {
+            background: #eef2f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;
+            display: flex; align-items: center; justify-content: center; gap: 15px;
+        }
+        .month-nav label { font-weight: bold; color: var(--main-color); }
+        #viewMonthSelect { border: 2px solid var(--main-color); font-weight: bold; color: var(--main-color); }
 
-        /* 第四點：結算卡片 */
         .summary-card {
             background: #fff; border: 2px solid var(--main-color); padding: 20px; border-radius: 10px;
             display: flex; justify-content: space-around; align-items: center; margin: 20px 0;
         }
         .summary-item { text-align: center; }
-        .summary-item label { display: block; font-size: 14px; color: #777; }
+        .summary-item label { display: block; font-size: 13px; color: #777; }
         .summary-item span { font-size: 24px; font-weight: bold; }
 
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
@@ -55,24 +59,31 @@
 
     <div id="auth-overlay">
         <div class="auth-box">
-            <h2 style="margin-top:0">帳號登入 / 註冊</h2>
+            <h2 style="margin-top:0">財務系統登入</h2>
             <form id="authForm">
-                <input type="text" id="username" placeholder="請輸入帳號" required>
-                <input type="password" id="password" placeholder="請輸入密碼" required>
+                <input type="text" id="username" placeholder="帳號" required>
+                <input type="password" id="password" placeholder="密碼" required>
                 <button type="submit">確認進入系統</button>
             </form>
             <p id="auth-msg" style="color:red; font-size:14px; margin-top:10px"></p>
         </div>
     </div>
 
-    <div class="container" id="app-container">
-        <button id="logout-btn">登出</button>
-        <h1 style="margin-top:0">雲端個人帳本</h1>
+    <div class="container">
+        <button id="logout-btn">登出系統</button>
+        <h1 style="margin-top:0">雲端財務帳本</h1>
 
         <div id="app-content">
+            
+            <div class="month-nav">
+                <label>📅 切換查看月份：</label>
+                <input type="month" id="viewMonthSelect">
+                <span style="font-size: 13px; color: #888;">(切換後下方所有資訊將同步更新)</span>
+            </div>
+
             <div class="grid">
                 <div>
-                    <h2>1. 新增交易紀錄</h2>
+                    <h2>1. 新增交易</h2>
                     <form id="transForm">
                         <select id="type">
                             <option value="支出">支出</option>
@@ -81,33 +92,32 @@
                         <input type="number" id="amt" placeholder="金額" required>
                         <input type="date" id="date" required>
                         <select id="cat"></select>
-                        <input type="text" id="note" placeholder="備註 (選填)">
+                        <input type="text" id="note" placeholder="備註">
                         <button type="submit">紀錄交易</button>
                     </form>
 
-                    <h2>3. 設定當月預算</h2>
+                    <h2>3. 設定類別預算</h2>
                     <form id="budgetForm">
                         <select id="budgetCat"></select>
-                        <input type="number" id="budgetAmt" placeholder="設定上限金額" required>
-                        <button type="submit" style="background:#7f8c8d">儲存預算設定</button>
+                        <input type="number" id="budgetAmt" placeholder="本月預算上限" required>
+                        <button type="submit" style="background:#7f8c8d">儲存預算</button>
                     </form>
                 </div>
 
                 <div>
-                    <h2>2. 當月分析 (薪資/預算扣除)</h2>
-                    <p>統計月份：<span id="curMonthText" style="font-weight:bold"></span></p>
+                    <h2>2. <span id="displayMonthLabel"></span> 預算分析</h2>
                     <table id="analysisTable">
-                        <thead><tr><th>類別</th><th>預算</th><th>實支</th><th>預算剩餘</th></tr></thead>
+                        <thead><tr><th>類別</th><th>預算</th><th>實支</th><th>結餘</th></tr></thead>
                         <tbody></tbody>
                     </table>
-                    <div style="height:200px; margin-top:20px"><canvas id="myChart"></canvas></div>
+                    <div style="height:220px; margin-top:20px"><canvas id="myChart"></canvas></div>
                 </div>
             </div>
 
-            <h2>4. 當月財務結算</h2>
+            <h2>4. <span id="displayMonthLabel2"></span> 財務結算</h2>
             <div class="summary-card">
                 <div class="summary-item">
-                    <label>當月總收入 (薪水+投資)</label>
+                    <label>當月總收入</label>
                     <span id="total-in" class="income-val">0</span>
                 </div>
                 <div style="font-size:30px; color:#ddd">|</div>
@@ -117,12 +127,12 @@
                 </div>
                 <div style="font-size:30px; color:#ddd">|</div>
                 <div class="summary-item">
-                    <label>本月結餘 (存款餘額)</label>
+                    <label>本月剩餘 (結餘)</label>
                     <span id="total-bal" style="color:var(--main-color)">0</span>
                 </div>
             </div>
 
-            <h2>歷史紀錄 (全部顯示)</h2>
+            <h2>5. <span id="displayMonthLabel3"></span> 交易紀錄清單</h2>
             <table id="historyTable">
                 <thead><tr><th>日期</th><th>類型</th><th>類別</th><th>金額</th><th>備註</th></tr></thead>
                 <tbody></tbody>
@@ -131,13 +141,13 @@
     </div>
 
     <script>
-        const STORE_KEY = 'LEDGER_FINAL_DATA';
+        const STORE_KEY = 'LEDGER_PAGED_DATA';
         const EX_CATS = ['餐飲', '交通', '住房', '娛樂', '購物', '其他'];
         const IN_CATS = ['薪水', '投資'];
         let currentUser = null;
         let chartObj = null;
 
-        // --- 登入控制 (修復重點) ---
+        // --- 登入控制 ---
         document.getElementById('authForm').onsubmit = function(e) {
             e.preventDefault();
             const u = document.getElementById('username').value.trim();
@@ -148,20 +158,16 @@
                 if (users[u].password === p) {
                     currentUser = u;
                     doLogin();
-                } else {
-                    document.getElementById('auth-msg').textContent = '密碼錯誤！';
-                }
+                } else { document.getElementById('auth-msg').textContent = '密碼錯誤！'; }
             } else {
                 users[u] = { password: p, data: { trans: [], budget: {} } };
                 localStorage.setItem(STORE_KEY, JSON.stringify(users));
                 currentUser = u;
                 doLogin();
-                alert('帳號已註冊並登入');
             }
         };
 
         function doLogin() {
-            // 雙重保險切換
             document.getElementById('auth-overlay').setAttribute('style', 'display:none !important');
             document.getElementById('app-content').style.display = 'block';
             initUI();
@@ -169,7 +175,6 @@
 
         document.getElementById('logout-btn').onclick = () => location.reload();
 
-        // --- 資料操作 ---
         function getMyData() {
             const users = JSON.parse(localStorage.getItem(STORE_KEY));
             return users[currentUser].data;
@@ -182,9 +187,17 @@
         }
 
         function initUI() {
-            document.getElementById('date').value = new Date().toISOString().substring(0, 10);
+            const now = new Date();
+            const curMonth = now.toISOString().substring(0, 7);
+            document.getElementById('viewMonthSelect').value = curMonth;
+            document.getElementById('date').value = now.toISOString().substring(0, 10);
+            
             document.getElementById('cat').innerHTML = [...EX_CATS, ...IN_CATS].map(c => `<option value="${c}">${c}</option>`).join('');
             document.getElementById('budgetCat').innerHTML = EX_CATS.map(c => `<option value="${c}">${c}</option>`).join('');
+            
+            // 當月份切換時觸發刷新
+            document.getElementById('viewMonthSelect').onchange = refresh;
+            
             refresh();
         }
 
@@ -209,36 +222,40 @@
         document.getElementById('budgetForm').onsubmit = function(e) {
             e.preventDefault();
             const d = getMyData();
-            const m = new Date().toISOString().substring(0, 7);
+            const m = document.getElementById('viewMonthSelect').value; // 根據當前選擇的月份設定預算
             const c = document.getElementById('budgetCat').value;
             if(!d.budget[m]) d.budget[m] = {};
             d.budget[m][c] = parseInt(document.getElementById('budgetAmt').value);
             saveMyData(d);
-            alert(c + ' 預算設定成功');
+            alert(m + ' ' + c + ' 預算設定成功');
             refresh();
         };
 
         function refresh() {
             const d = getMyData();
-            const m = new Date().toISOString().substring(0, 7);
-            document.getElementById('curMonthText').textContent = m;
+            const m = document.getElementById('viewMonthSelect').value;
+            
+            // 更新標籤
+            document.querySelectorAll('[id^="displayMonthLabel"]').forEach(el => el.textContent = m);
 
             let tin = 0, tout = 0;
             const spent = {};
             EX_CATS.forEach(c => spent[c] = 0);
 
-            // 計算當月
-            d.trans.filter(t => t.m === m).forEach(t => {
+            // 1. 過濾選定月份的資料
+            const filteredTrans = d.trans.filter(t => t.m === m);
+
+            filteredTrans.forEach(t => {
                 if(t.type === '收入') tin += t.amt;
                 else { tout += t.amt; if(spent.hasOwnProperty(t.cat)) spent[t.cat] += t.amt; }
             });
 
-            // 更新結算
+            // 2. 更新結算
             document.getElementById('total-in').textContent = tin.toLocaleString();
             document.getElementById('total-out').textContent = tout.toLocaleString();
             document.getElementById('total-bal').textContent = (tin - tout).toLocaleString();
 
-            // 更新預算表
+            // 3. 更新預算分析表
             const b = d.budget[m] || {};
             const tbody = document.querySelector('#analysisTable tbody');
             tbody.innerHTML = '';
@@ -250,15 +267,18 @@
                 }
             });
 
-            // 更新歷史 (不限筆數)
+            // 4. 更新該月歷史明細 (分頁顯示)
             const hBody = document.querySelector('#historyTable tbody');
             hBody.innerHTML = '';
-            [...d.trans].reverse().forEach(t => {
+            [...filteredTrans].reverse().forEach(t => {
                 const row = hBody.insertRow();
                 row.innerHTML = `<td>${t.date}</td><td class="${t.type==='收入'?'income-val':'expense-val'}">${t.type}</td><td>${t.cat}</td><td>${t.amt.toLocaleString()}</td><td style="color:#888;font-size:12px">${t.note}</td>`;
             });
+            if(filteredTrans.length === 0) {
+                hBody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999">本月份尚無任何交易紀錄</td></tr>';
+            }
 
-            // 更新圖表
+            // 5. 更新圖表
             const ctx = document.getElementById('myChart').getContext('2d');
             if(chartObj) chartObj.destroy();
             chartObj = new Chart(ctx, {
