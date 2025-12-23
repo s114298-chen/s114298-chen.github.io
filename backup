@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>個人記帳程式 - 專業修復版</title>
+    <link rel="icon" href="722320.png">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    
+    <style>
+        :root {
+            /* 修改為柔和、不刺眼的藍色系 */
+            --main-color: #5c8ab3; /* 柔和灰藍 */
+            --main-color-dark: #4a6e8f; 
+            --bg-light: #f0f2f5; 
+            --text-color: #444;
+        }
+
+        body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; margin: 0; padding: 20px; background-color: var(--bg-light); color: var(--text-color); }
+        .container { max-width: 950px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); }
+        h1, h2 { color: var(--main-color); border-bottom: 2px solid #f0f0f0; padding-bottom: 10px; margin-top: 20px; }
+        .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        form { display: flex; flex-direction: column; gap: 12px; }
+        input, select { padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 15px; outline: none; transition: border 0.3s; }
+        input:focus { border-color: var(--main-color); }
+        
+        button { background-color: var(--main-color); color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.3s; }
+        button:hover { background-color: var(--main-color-dark); }
+        
+        #recordsTable { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        #recordsTable th, #recordsTable td { border-bottom: 1px solid #eee; padding: 12px; text-align: left; }
+        #recordsTable th { background-color: #fafafa; color: #666; }
+        .income { color: #2ecc71; font-weight: bold; }
+        .expense { color: #e74c3c; font-weight: bold; }
+        .overspent { color: #e74c3c; font-weight: bold; text-decoration: underline; }
+
+        /* 登入區塊 */
+        #auth-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0, 0, 0, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000;
+        }
+        #auth-box { background: #fff; padding: 40px; border-radius: 12px; width: 320px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        #app-content { display: none; }
+        #logout-btn { background-color: #aeb6bf; margin-bottom: 10px; float: right; padding: 8px 15px; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+    <div id="auth-overlay">
+        <div id="auth-box">
+            <h2>帳號登入</h2>
+            <form id="authForm">
+                <input type="text" id="username" placeholder="使用者名稱" required>
+                <input type="password" id="password" placeholder="密碼" required>
+                <button type="submit">登入 / 註冊</button>
+                <p id="auth-message" style="color: #e74c3c; font-size: 14px;"></p>
+            </form>
+        </div>
+    </div>
+
+    <div class="container">
+        <button id="logout-btn">登出系統</button>
+        <h1 id="app-title">個人雲端帳本</h1>
+
+        <div id="app-content">
+            <p id="user-info" style="font-weight: bold;"></p>
+
+            <div class="grid-container">
+                <div>
+                    <h2>1. 新增交易紀錄</h2>
+                    <form id="transactionForm">
+                        <select id="type" required>
+                            <option value="支出">支出</option>
+                            <option value="收入">收入</option>
+                        </select>
+                        <input type="number" id="amount" placeholder="金額" min="0" step="1" required>
+                        <input type="date" id="date" required>
+                        <select id="category" required>
+                            </select>
+                        <input type="text" id="note" placeholder="備註 (選填)">
+                        <button type="submit">確認儲存</button>
+                    </form>
+
+                    <h2>3. 每月預算設定</h2>
+                    <form id="budgetForm">
+                        <select id="budgetCategory" required>
+                            </select>
+                        <input type="number" id="budgetAmount" placeholder="設定預算上限" min="0" required>
+                        <button type="submit">設定預算</button>
+                    </form>
+                </div>
+
+                <div>
+                    <h2>2. 當月預算分析</h2>
+                    <p>統計月份：<span id="currentMonthText" style="color: var(--main-color); font-weight: bold;"></span></p>
+                    <table id="budgetSummaryTable" style="width:100%; font-size: 14px;">
+                        <thead><tr><th>類別</th><th>預算</th><th>實支</th><th>剩餘</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                    <br>
+                    <canvas id="monthlyChart" style="max-height: 250px;"></canvas>
+                </div>
+            </div>
+            
+            <h2>歷史交易清單 (所有紀錄)</h2>
+            <table id="recordsTable">
+                <thead>
+                    <tr><th>日期</th><th>類型</th><th>類別</th><th>金額</th><th>備註</th></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const ALL_USERS_KEY = 'LedgerApp_Users';
+        // 完整的類別定義
+        const EXPENSE_CATS = ['餐飲', '交通', '住房', '娛樂', '購物', '其他'];
+        const INCOME_CATS = ['薪水', '投資'];
+        const ALL_CATS = [...EXPENSE_CATS, ...INCOME_CATS];
+
+        let currentUsername = null;
+
+        // --- 登入邏輯 ---
+        document.getElementById('authForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const u = document.getElementById('username').value.trim();
+            const p = document.getElementById('password').value;
+            const msg = document.getElementById('auth-message');
+            const users = JSON.parse(localStorage.getItem(ALL_USERS_KEY) || '{}');
+
+            if (users[u]) {
+                if (users[u].password === p) {
+                    currentUsername = u;
+                    loginSuccess();
+                } else {
+                    msg.textContent = '密碼錯誤！';
+                }
+            } else {
+                users[u] = { password: p, data: { transactions: [], budgets: {} } };
+                localStorage.setItem(ALL_USERS_KEY, JSON.stringify(users));
+                currentUsername = u;
+                loginSuccess();
+                alert('帳號已成功註冊並登入！');
+            }
+        });
+
+        function loginSuccess() {
+            document.getElementById('auth-overlay').style.display = 'none';
+            document.getElementById('app-content').style.display = 'block';
+            document.getElementById('user-info').textContent = `你好, ${currentUsername}。今天過得如何？`;
+            initApp();
+        }
+
+        document.getElementById('logout-btn').addEventListener('click', () => location.reload());
+
+        // --- 核心功能 ---
+        function getUserData() {
+            const users = JSON.parse(localStorage.getItem(ALL_USERS_KEY));
+            return users[currentUsername].data;
+        }
+
+        function saveUserData(data) {
+            const users = JSON.parse(localStorage.getItem(ALL_USERS_KEY));
+            users[currentUsername].data = data;
+            localStorage.setItem(ALL_USERS_KEY, JSON.stringify(users));
+        }
+
+        function initApp() {
+            // 初始化日期
+            document.getElementById('date').value = new Date().toISOString().substring(0, 10);
+            
+            // 初始化下拉選單
+            const catSelect = document.getElementById('category');
+            const bugSelect = document.getElementById('budgetCategory');
+            catSelect.innerHTML = ALL_CATS.map(c => `<option value="${c}">${c}</option>`).join('');
+            bugSelect.innerHTML = EXPENSE_CATS.map(c => `<option value="${c}">${c}</option>`).join('');
+            
+            updateUI();
+        }
+
+        // 提交交易：修復多筆輸入問題
+        document.getElementById('transactionForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const data = getUserData();
+            const dateVal = document.getElementById('date').value;
+            
+            const newRecord = {
+                id: Date.now(),
+                type: document.getElementById('type').value,
+                amount: parseInt(document.getElementById('amount').value),
+                category: document.getElementById('category').value,
+                note: document.getElementById('note').value,
+                date: dateVal,
+                month: dateVal.substring(0, 7)
+            };
+
+            data.transactions.push(newRecord);
+            saveUserData(data);
+
+            // 清空金額與備註，保留日期與類別，方便下一筆
+            document.getElementById('amount').value = '';
+            document.getElementById('note').value = '';
+            
+            updateUI();
+        });
+
+        // 提交預算：修復全種類設定問題
+        document.getElementById('budgetForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const data = getUserData();
+            const month = new Date().toISOString().substring(0, 7);
+            const cat = document.getElementById('budgetCategory').value;
+            const amt = parseInt(document.getElementById('budgetAmount').value);
+
+            if (!data.budgets[month]) data.budgets[month] = {};
+            data.budgets[month][cat] = amt;
+            
+            saveUserData(data);
+            alert(`${cat} 預算已設定為 ${amt}`);
+            updateUI();
+        });
+
+        let chart = null;
+        function updateUI() {
+            const data = getUserData();
+            const currentMonth = new Date().toISOString().substring(0, 7);
+            document.getElementById('currentMonthText').textContent = currentMonth;
+
+            // 1. 歷史清單：修復顯示限制
+            const tbody = document.querySelector('#recordsTable tbody');
+            tbody.innerHTML = '';
+            [...data.transactions].reverse().forEach(t => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${t.date}</td>
+                    <td class="${t.type === '收入' ? 'income' : 'expense'}">${t.type}</td>
+                    <td>${t.category}</td>
+                    <td>${t.amount.toLocaleString()}</td>
+                    <td style="color:#888; font-size:13px;">${t.note}</td>
+                `;
+            });
+
+            // 2. 預算統計
+            const summaryBody = document.querySelector('#budgetSummaryTable tbody');
+            summaryBody.innerHTML = '';
+            const monthlyBudgets = data.budgets[currentMonth] || {};
+            const monthlySpending = {};
+            
+            EXPENSE_CATS.forEach(c => monthlySpending[c] = 0);
+            data.transactions.filter(t => t.month === currentMonth && t.type === '支出').forEach(t => {
+                monthlySpending[t.category] += t.amount;
+            });
+
+            EXPENSE_CATS.forEach(cat => {
+                if (monthlyBudgets[cat] || monthlySpending[cat] > 0) {
+                    const budget = monthlyBudgets[cat] || 0;
+                    const spent = monthlySpending[cat];
+                    const remain = budget - spent;
+                    const row = summaryBody.insertRow();
+                    row.innerHTML = `
+                        <td>${cat}</td>
+                        <td>${budget}</td>
+                        <td>${spent}</td>
+                        <td class="${remain < 0 ? 'overspent' : ''}">${remain}</td>
+                    `;
+                }
+            });
+
+            // 3. 圖表更新
+            const ctx = document.getElementById('monthlyChart').getContext('2d');
+            if (chart) chart.destroy();
+            chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: EXPENSE_CATS,
+                    datasets: [
+                        { label: '支出', data: EXPENSE_CATS.map(c => monthlySpending[c]), backgroundColor: '#5c8ab3' },
+                        { label: '預算', data: EXPENSE_CATS.map(c => monthlyBudgets[c] || 0), backgroundColor: '#d5dbdb' }
+                    ]
+                },
+                options: { responsive: true, scales: { y: { beginAtZero: true } } }
+            });
+        }
+    </script>
+</body>
+</html>
