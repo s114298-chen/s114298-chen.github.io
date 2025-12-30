@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>個人雲端帳本 - 永久存儲版</title>
+    <title>個人記帳本 - 網頁版</title>
+    <link rel="icon" href="722320.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
         :root {
@@ -56,10 +57,10 @@
 
     <div id="auth-overlay">
         <div class="auth-box">
-            <h2 style="margin-top:0">財務系統登入</h2>
+            <h2 style="margin-top:0">帳號登入 / 註冊</h2>
             <form id="authForm">
-                <input type="text" id="username" placeholder="帳號" required>
-                <input type="password" id="password" placeholder="密碼" required>
+                <input type="text" id="username" placeholder="請輸入帳號" required>
+                <input type="password" id="password" placeholder="請輸入密碼" required>
                 <button type="submit">確認進入系統</button>
             </form>
             <p id="auth-msg" style="color:red; font-size:14px; margin-top:10px"></p>
@@ -91,28 +92,29 @@
                         <button type="submit">紀錄交易</button>
                     </form>
 
-                    <h2>3. 設定類別預算</h2>
+                    <h2>3. 設定當月預算</h2>
                     <form id="budgetForm">
                         <select id="budgetCat"></select>
-                        <input type="number" id="budgetAmt" placeholder="本月預算上限" required>
-                        <button type="submit" style="background:#7f8c8d">儲存預算</button>
+                        <input type="number" id="budgetAmt" placeholder="設定上限金額" required>
+                        <button type="submit" style="background:#7f8c8d">儲存預算設定</button>
                     </form>
                 </div>
 
                 <div>
-                    <h2>2. <span id="displayMonthLabel"></span> 預算分析</h2>
+                    <h2>2. 當月分析 (薪資/預算扣除)</h2>
+                    <p>統計月份：<span id="curMonthText" style="font-weight:bold"></span></p>
                     <table id="analysisTable">
-                        <thead><tr><th>類別</th><th>預算</th><th>實支</th><th>結餘</th></tr></thead>
+                        <thead><tr><th>類別</th><th>預算</th><th>實支</th><th>預算剩餘</th></tr></thead>
                         <tbody></tbody>
                     </table>
-                    <div style="height:220px; margin-top:20px"><canvas id="myChart"></canvas></div>
+                    <div style="height:200px; margin-top:20px"><canvas id="myChart"></canvas></div>
                 </div>
             </div>
 
-            <h2>4. <span id="displayMonthLabel2"></span> 財務結算</h2>
+            <h2>4. 當月財務結算</h2>
             <div class="summary-card">
                 <div class="summary-item">
-                    <label>當月總收入</label>
+                    <label>當月總收入 (薪水+投資)</label>
                     <span id="total-in" class="income-val">0</span>
                 </div>
                 <div style="font-size:30px; color:#ddd">|</div>
@@ -122,12 +124,12 @@
                 </div>
                 <div style="font-size:30px; color:#ddd">|</div>
                 <div class="summary-item">
-                    <label>本月剩餘 (結餘)</label>
+                    <label>本月結餘 (存款餘額)</label>
                     <span id="total-bal" style="color:var(--main-color)">0</span>
                 </div>
             </div>
 
-            <h2>5. <span id="displayMonthLabel3"></span> 交易紀錄清單</h2>
+            <h2>歷史紀錄 (全部顯示)</h2>
             <table id="historyTable">
                 <thead><tr><th>日期</th><th>類型</th><th>類別</th><th>金額</th><th>備註</th></tr></thead>
                 <tbody></tbody>
