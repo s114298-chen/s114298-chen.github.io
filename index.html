@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>個人記帳本 - 網頁版</title>
-    <link rel="icon" href="722320.png">
+    <title>個人雲端帳本 - 永久存儲版</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
         :root {
-            --main-color: #5c8ab3; /* 柔和灰藍色 */
+            --main-color: #5c8ab3;
             --main-bg: #f5f7f9;
             --income-color: #2ecc71;
             --expense-color: #e74c3c;
@@ -17,13 +16,11 @@
         body { font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif; background: var(--main-bg); color: #333; margin: 0; padding: 20px; }
         .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         
-        /* 登入介面 */
         #auth-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
             background: #2c3e50; display: flex; justify-content: center; align-items: center; z-index: 9999;
         }
         .auth-box { background: white; padding: 40px; border-radius: 15px; width: 320px; text-align: center; }
-        
         #app-content { display: none; }
 
         h1, h2 { color: var(--main-color); border-bottom: 2px solid #eee; padding-bottom: 10px; }
@@ -32,13 +29,12 @@
         input, select { padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 15px; }
         button { background: var(--main-color); color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; }
         
-        /* 月份切換列 */
         .month-nav {
             background: #eef2f6; padding: 15px; border-radius: 8px; margin-bottom: 20px;
             display: flex; align-items: center; justify-content: center; gap: 15px;
         }
         .month-nav label { font-weight: bold; color: var(--main-color); }
-        #viewMonthSelect { border: 2px solid var(--main-color); font-weight: bold; color: var(--main-color); }
+        #viewMonthSelect { border: 2px solid var(--main-color); font-weight: bold; color: var(--main-color); padding: 5px 10px; }
 
         .summary-card {
             background: #fff; border: 2px solid var(--main-color); padding: 20px; border-radius: 10px;
@@ -60,26 +56,24 @@
 
     <div id="auth-overlay">
         <div class="auth-box">
-            <h2 style="margin-top:0">帳號登入 / 註冊</h2>
+            <h2 style="margin-top:0">財務系統登入</h2>
             <form id="authForm">
-                <input type="text" id="username" placeholder="請輸入帳號" required>
-                <input type="password" id="password" placeholder="請輸入密碼" required>
-                <button type="submit">確認進入</button>
+                <input type="text" id="username" placeholder="帳號" required>
+                <input type="password" id="password" placeholder="密碼" required>
+                <button type="submit">確認進入系統</button>
             </form>
             <p id="auth-msg" style="color:red; font-size:14px; margin-top:10px"></p>
         </div>
     </div>
 
     <div class="container">
-        <button id="logout-btn">登出</button>
+        <button id="logout-btn">登出系統</button>
         <h1 style="margin-top:0">雲端個人帳本</h1>
 
         <div id="app-content">
-            
             <div class="month-nav">
                 <label>📅 切換查看月份：</label>
                 <input type="month" id="viewMonthSelect">
-                <span style="font-size: 13px; color: #888;">(切換後下方所有資訊將同步更新)</span>
             </div>
 
             <div class="grid">
@@ -142,18 +136,40 @@
     </div>
 
     <script>
-        const STORE_KEY = 'LEDGER_PAGED_DATA';
+        const STORE_KEY = 'LEDGER_MAIN_VAULT'; // 使用全新的穩定金鑰，確保不被舊版本干擾
         const EX_CATS = ['餐飲', '交通', '住房', '娛樂', '購物', '其他'];
         const IN_CATS = ['薪水', '投資'];
         let currentUser = null;
         let chartObj = null;
 
-        // --- 登入控制 ---
+        // --- 核心安全存取函數 ---
+        function getAllUsers() {
+            try {
+                return JSON.parse(localStorage.getItem(STORE_KEY)) || {};
+            } catch (e) {
+                console.error("資料讀取失敗，重建中...");
+                return {};
+            }
+        }
+
+        function getMyData() {
+            const users = getAllUsers();
+            return users[currentUser] ? users[currentUser].data : { trans: [], budget: {} };
+        }
+
+        function saveMyData(newData) {
+            const users = getAllUsers();
+            if (!users[currentUser]) return;
+            users[currentUser].data = newData;
+            localStorage.setItem(STORE_KEY, JSON.stringify(users));
+        }
+
+        // --- 登入與初始化 ---
         document.getElementById('authForm').onsubmit = function(e) {
             e.preventDefault();
             const u = document.getElementById('username').value.trim();
             const p = document.getElementById('password').value;
-            const users = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+            const users = getAllUsers();
 
             if (users[u]) {
                 if (users[u].password === p) {
@@ -176,45 +192,36 @@
 
         document.getElementById('logout-btn').onclick = () => location.reload();
 
-        function getMyData() {
-            const users = JSON.parse(localStorage.getItem(STORE_KEY));
-            return users[currentUser].data;
-        }
-
-        function saveMyData(d) {
-            const users = JSON.parse(localStorage.getItem(STORE_KEY));
-            users[currentUser].data = d;
-            localStorage.setItem(STORE_KEY, JSON.stringify(users));
-        }
-
         function initUI() {
             const now = new Date();
             const curMonth = now.toISOString().substring(0, 7);
             document.getElementById('viewMonthSelect').value = curMonth;
             document.getElementById('date').value = now.toISOString().substring(0, 10);
-            
             document.getElementById('cat').innerHTML = [...EX_CATS, ...IN_CATS].map(c => `<option value="${c}">${c}</option>`).join('');
             document.getElementById('budgetCat').innerHTML = EX_CATS.map(c => `<option value="${c}">${c}</option>`).join('');
-            
-            // 當月份切換時觸發刷新
             document.getElementById('viewMonthSelect').onchange = refresh;
-            
             refresh();
         }
 
+        // --- 新增紀錄 (修正存檔邏輯) ---
         document.getElementById('transForm').onsubmit = function(e) {
             e.preventDefault();
+            
+            // 每次儲存前「重新抓取」資料庫，防止覆蓋
             const d = getMyData();
-            const date = document.getElementById('date').value;
+            const dateInput = document.getElementById('date').value;
+            
             d.trans.push({
                 type: document.getElementById('type').value,
-                amt: parseInt(document.getElementById('amt').value),
-                date: date,
+                amt: parseInt(document.getElementById('amt').value) || 0,
+                date: dateInput,
                 cat: document.getElementById('cat').value,
                 note: document.getElementById('note').value,
-                m: date.substring(0, 7)
+                m: dateInput.substring(0, 7)
             });
-            saveMyData(d);
+            
+            saveMyData(d); // 立即寫入硬碟
+            
             document.getElementById('amt').value = '';
             document.getElementById('note').value = '';
             refresh();
@@ -223,12 +230,12 @@
         document.getElementById('budgetForm').onsubmit = function(e) {
             e.preventDefault();
             const d = getMyData();
-            const m = document.getElementById('viewMonthSelect').value; // 根據當前選擇的月份設定預算
+            const m = document.getElementById('viewMonthSelect').value;
             const c = document.getElementById('budgetCat').value;
             if(!d.budget[m]) d.budget[m] = {};
-            d.budget[m][c] = parseInt(document.getElementById('budgetAmt').value);
+            d.budget[m][c] = parseInt(document.getElementById('budgetAmt').value) || 0;
             saveMyData(d);
-            alert(m + ' ' + c + ' 預算設定成功');
+            alert('預算已儲存');
             refresh();
         };
 
@@ -236,27 +243,22 @@
             const d = getMyData();
             const m = document.getElementById('viewMonthSelect').value;
             
-            // 更新標籤
             document.querySelectorAll('[id^="displayMonthLabel"]').forEach(el => el.textContent = m);
 
             let tin = 0, tout = 0;
             const spent = {};
             EX_CATS.forEach(c => spent[c] = 0);
 
-            // 1. 過濾選定月份的資料
             const filteredTrans = d.trans.filter(t => t.m === m);
-
             filteredTrans.forEach(t => {
                 if(t.type === '收入') tin += t.amt;
                 else { tout += t.amt; if(spent.hasOwnProperty(t.cat)) spent[t.cat] += t.amt; }
             });
 
-            // 2. 更新結算
             document.getElementById('total-in').textContent = tin.toLocaleString();
             document.getElementById('total-out').textContent = tout.toLocaleString();
             document.getElementById('total-bal').textContent = (tin - tout).toLocaleString();
 
-            // 3. 更新預算分析表
             const b = d.budget[m] || {};
             const tbody = document.querySelector('#analysisTable tbody');
             tbody.innerHTML = '';
@@ -268,18 +270,13 @@
                 }
             });
 
-            // 4. 更新該月歷史明細 (分頁顯示)
             const hBody = document.querySelector('#historyTable tbody');
             hBody.innerHTML = '';
-            [...filteredTrans].reverse().forEach(t => {
+            [...filteredTrans].sort((a,b)=>b.date.localeCompare(a.date)).forEach(t => {
                 const row = hBody.insertRow();
                 row.innerHTML = `<td>${t.date}</td><td class="${t.type==='收入'?'income-val':'expense-val'}">${t.type}</td><td>${t.cat}</td><td>${t.amt.toLocaleString()}</td><td style="color:#888;font-size:12px">${t.note}</td>`;
             });
-            if(filteredTrans.length === 0) {
-                hBody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999">本月份尚無任何交易紀錄</td></tr>';
-            }
 
-            // 5. 更新圖表
             const ctx = document.getElementById('myChart').getContext('2d');
             if(chartObj) chartObj.destroy();
             chartObj = new Chart(ctx, {
